@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UCT CPQ — Configuratore Aziendale</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Barlow+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Barlow',sans-serif;background:#F2F2F0;color:#3D3D3C;min-height:100vh}
+input,select,textarea{font-family:'Barlow',sans-serif !important;color:#3D3D3C !important;background:#ffffff !important;border:1px solid #D5D3CE;border-radius:4px;padding:5px 8px;font-size:13px;color-scheme:light !important;-webkit-text-fill-color:#3D3D3C !important;}
+input::placeholder,textarea::placeholder{color:#B0ADA6 !important;-webkit-text-fill-color:#B0ADA6 !important;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#F08A05;box-shadow:0 0 0 2px rgba(240,138,5,0.12);}
+button{font-family:'Barlow',sans-serif;border:1px solid #D5D3CE;background:#ffffff;color:#3D3D3C;border-radius:4px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.15s;}
+button:hover{background:#F2F2F0;border-color:#F08A05;}
+.btn-o{background:#F08A05 !important;color:#fff !important;border-color:#F08A05 !important;font-weight:600;}
+.btn-o:hover{background:#D4780A !important;}
+.btn-d{background:#3D3D3C !important;color:#fff !important;border-color:#3D3D3C !important;font-weight:600;}
+.lbl{font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:600;color:#3D3D3C;letter-spacing:0.1em;text-transform:uppercase}
+.lbl2{font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:500;color:#666462;letter-spacing:0.09em;text-transform:uppercase}
+.lbl-o{font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:600;color:#F08A05;letter-spacing:0.12em;text-transform:uppercase}
+.pb{background:#fff;border:1px solid #D5D3CE;border-radius:4px;padding:7px 10px;min-width:0}
+.pb.hi{border:1.5px solid #F08A05}
+.pb .pl{font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;letter-spacing:0.09em;text-transform:uppercase;color:#666462;margin-bottom:2px}
+.pb.hi .pl{color:#c07200}
+.pb .pv{font-size:14px;font-weight:700;color:#3D3D3C}
+.pb.hi .pv{color:#F08A05}
+.pb .ps{font-size:11px;color:#666462;margin-top:1px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.52);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.modal-box{background:#fff;border-radius:8px;padding:28px 32px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+.toast{position:fixed;bottom:24px;right:24px;z-index:99999;background:#3D3D3C;color:#fff;padding:12px 20px;border-radius:6px;font-size:13px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,0.2);animation:slideIn 0.2s ease;max-width:320px;}
+.toast.ok{background:#1a5212;border-left:4px solid #3d9e28;}
+.toast.err{background:#7A1200;border-left:4px solid #c0200a;}
+@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+</style>
+</head>
+<body>
+<div id="app">Caricamento...</div>
+<script>
+const EJS_PUBLIC_KEY='Km5hg4wrxjQZWZyKb';
+const EJS_SERVICE_ID='service_raej3za';
+const EJS_TEMPLATE_ID='template_lh2n8qj';
+const OTP_VALIDITY_MS=48*60*60*1000;
+const APPROVERS={
+  cfok:{name:'CFO',email:'g.vincenti@uctissue.com'},
+  admk:{name:'Amministratore',email:'y.inghilesi@uctissue.com'}
+};
+emailjs.init(EJS_PUBLIC_KEY);
+
+const LS_KEY='uct_cpq_v1';
+const OTP_KEY='uct_cpq_otp';
+function lsGet(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'{}')}catch(e){return{}}}
+function lsSet(d){try{localStorage.setItem(LS_KEY,JSON.stringify(d))}catch(e){}}
+function otpGet(){try{return JSON.parse(localStorage.getItem(OTP_KEY)||'{}')}catch(e){return{}}}
+function otpSet(d){localStorage.setItem(OTP_KEY,JSON.stringify(d))}
+function otpGenerate(qid,role){
+  const code=String(Math.floor(100000+Math.random()*900000));
+  const store=otpGet();
+  store[qid+'_'+role]={code,expires:Date.now()+OTP_VALIDITY_MS};
+  otpSet(store);return code;
+}
+function otpVerify(qid,role,input){
+  const store=otpGet();const entry=store[qid+'_'+role];
+  if(!entry)return false;
+  if(Date.now()>entry.expires){delete store[qid+'_'+role];otpSet(store);return false;}
+  if(entry.code!==String(input).trim())return false;
+  delete store[qid+'_'+role];otpSet(store);return true;
+}
+
+const PB="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:6px 14px;border-radius:3px;cursor:pointer;border:1.5px solid;transition:all 0.15s;";
+const PON=PB+"border-color:#3D3D3C !important;background:#3D3D3C !important;color:#ffffff !important;";
+const POFF=PB+"border-color:#D5D3CE !important;background:#ffffff !important;color:#3D3D3C !important;";
+const WS="color:#3D3D3C !important;background:#ffffff !important;color-scheme:light;-webkit-text-fill-color:#3D3D3C !important;";
+
+function fmtN(n){if(n===null||n===undefined||n==='')return'0';return Math.round(Number(n)).toLocaleString('it-IT');}
+function parseN(s){if(s===null||s===undefined||s==='')return 0;return parseInt(String(s).replace(/\./g,'').replace(/,/g,''))||0;}
+function fmtE(n){if(n===null||n===undefined)return'—';return'€ '+Math.round(n).toLocaleString('it-IT');}
+function fmtC(n,q){const c=getCurr(q);if(c.code==='EUR')return fmtE(n);return c.sym+' '+Math.round(n*c.rate).toLocaleString('it-IT');}
+function fmtTs(ts){return ts?new Date(ts).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';}
+function iT(val,onB,xStyle='',w=52){return`<input type="text" inputmode="numeric" value="${fmtN(val)}" style="${WS}width:${w}px;text-align:center;font-size:13px;font-weight:600;border:1px solid #D5D3CE;border-radius:4px;padding:3px 5px;${xStyle}" onfocus="this.value=this.value.replace(/\\./g,'')" onblur="${onB}" onkeydown="if(event.key==='Enter')this.blur()">`;}
+function iTO(val,onB,w=70){return`<input type="text" inputmode="numeric" value="${fmtN(val)}" style="${WS}width:${w}px;text-align:right;font-size:12px;font-weight:600;padding:3px 5px;border:1px solid #F08A05;border-radius:4px;" onfocus="this.value=this.value.replace(/\\./g,'')" onblur="${onB}" onkeydown="if(event.key==='Enter')this.blur()">`;}
+function iTB(val,onB,w=70){return`<input type="text" inputmode="numeric" value="${fmtN(val)}" style="${WS}width:${w}px;text-align:right;font-size:12px;font-weight:600;padding:3px 5px;border:1px solid #2a7ac4;border-radius:4px;" onfocus="this.value=this.value.replace(/\\./g,'')" onblur="${onB}" onkeydown="if(event.key==='Enter')this.blur()">`;}
+function iTR(val,onB,w=80){return`<input type="text" inputmode="numeric" value="${fmtN(val)}" style="${WS}width:${w}px;text-align:right;font-size:13px;font-weight:600;padding:3px 6px;border:1px solid #D5D3CE;border-radius:4px;" onfocus="this.value=this.value.replace(/\\./g,'')" onblur="${onB}" onkeydown="if(event.key==='Enter')this.blur()">`;}
+function iTDec(val,onB,w=80){return`<input type="text" inputmode="decimal" value="${String(val).replace('.',',')}" style="${WS}width:${w}px;text-align:center;font-size:14px;font-weight:600;padding:5px 8px;border:1px solid #D5D3CE;border-radius:4px;" onfocus="this.select()" onblur="${onB}" onkeydown="if(event.key==='Enter')this.blur()">`;}
+function toast(msg,type='ok',duration=3500){const el=document.createElement('div');el.className='toast '+(type==='err'?'err':'ok');el.innerHTML=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),duration);}
+
+const Q_HIGH=['Q1','Q2','Q3'];
+function getMarkup(cod,techId){if(techId===null||techId===0)return 0;const h=Q_HIGH.includes(cod);if(techId===1)return h?0.20:0.04;if(techId===2)return h?0.05:0.01;return 0;}
+const SUGG={
+  0:[{cod:'A',name:'BD19'},{cod:'A',name:'BD20'},{cod:'D',name:'SIDERIS 40L'},{cod:'I',name:'S60'},{cod:'I',name:'S70'},{cod:'J',name:'ST8I'},{cod:'J',name:'ST16I'},{cod:'L',name:'RDT'},{cod:'L',name:'LA35'},{cod:'M',name:'T35'},{cod:'M',name:'UNICO365'},{cod:'N',name:'CW60I'},{cod:'O',name:'CWB60C'},{cod:'Q1',name:'Start e Stop'},{cod:'Q2',name:'Quadro Troncatore'},{cod:'Q3',name:'Quadro Tubiera'},{cod:'R',name:'Singolo Modulo'},{cod:'R',name:'S60/S70/V120/V170'}],
+  1:[{cod:'A',name:'BD20'},{cod:'A',name:'BD25'},{cod:'D',name:'SIDERIS 40L'},{cod:'D',name:'SIDERIS 50L'},{cod:'D',name:'SIDERIS 65L'},{cod:'I',name:'NEXUS 50I'},{cod:'I',name:'NEXUS 65I'},{cod:'J',name:'ST8I'},{cod:'J',name:'ST16I'},{cod:'J',name:'ST35C'},{cod:'L',name:'RDT'},{cod:'L',name:'LA35'},{cod:'L',name:'LA40'},{cod:'M',name:'T35'},{cod:'M',name:'UNICO365'},{cod:'N',name:'CW60I'},{cod:'O',name:'CWB60C'},{cod:'Q1',name:'Industriale'},{cod:'Q2',name:'Quadro Troncatore'},{cod:'Q3',name:'Quadro Tubiera'},{cod:'R',name:'Singolo Modulo'},{cod:'R',name:'50I/50C/65I/V180'}],
+  2:[{cod:'A',name:'BD25'},{cod:'D',name:'SIDERIS 65L'},{cod:'I',name:'NEXUS 65C'},{cod:'J',name:'ST35C'},{cod:'J',name:'ST50C'},{cod:'L',name:'LA150'},{cod:'L',name:'LA250'},{cod:'M',name:'GLADIUS250'},{cod:'N',name:'CW130C'},{cod:'N',name:'CW160C'},{cod:'O',name:'CWB130C'},{cod:'Q1',name:'Consumer'},{cod:'Q2',name:'Quadro Troncatore'},{cod:'Q3',name:'Quadro Tubiera'},{cod:'R',name:'Singolo Modulo'},{cod:'R',name:'65C'},{cod:'R',name:'65C+'}],
+  3:[{cod:'A',name:'BD19'},{cod:'A',name:'BD20'},{cod:'D',name:'SIDERIS 40L'},{cod:'D',name:'VARIO 50L'},{cod:'F',name:'180C'},{cod:'F',name:'250C'},{cod:'H',name:'V170'},{cod:'J',name:'ST8I'},{cod:'J',name:'ST16I'},{cod:'L',name:'LA35'},{cod:'L',name:'LA40'},{cod:'M',name:'ENSIS 150'},{cod:'M',name:'T35'},{cod:'M',name:'UNICO365'},{cod:'Q1',name:'Industriale'},{cod:'Q2',name:'Quadro Troncatore'},{cod:'Q4',name:'Quadro Pompa del Vuoto'},{cod:'R',name:'Singolo Modulo'},{cod:'R',name:'S60/S70/V120/V170'},{cod:'R',name:'50I/50C/65I/V180'},{cod:'R',name:'65C'},{cod:'R',name:'65C+'}]
+};
+function isSuggested(midx,tipoId){if(tipoId===null||tipoId===4)return true;const s=SUGG[tipoId];if(!s)return true;const b=MB[midx];if(!b)return false;return s.some(x=>x.cod===b.cod&&x.name===b.name);}
+const COMM_DEF={
+  0:{U:{nT:2,ggOp:10,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},V:{nT:2,ggOp:5,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},W:{nT:1,ggOp:5,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},wG:45},
+  1:{U:{nT:2,ggOp:10,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},V:{nT:2,ggOp:10,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},W:{nT:1,ggOp:5,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},wG:55},
+  2:{U:{nT:4,ggOp:18,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},V:{nT:3,ggOp:24,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},W:{nT:1,ggOp:12,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},wG:180},
+  3:{U:{nT:2,ggOp:12,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},V:{nT:3,ggOp:24,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},W:{nT:1,ggOp:12,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},wG:120},
+  4:{U:{nT:2,ggOp:10,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},V:{nT:2,ggOp:10,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},W:{nT:1,ggOp:5,ggRip:null,ggViag:null,rateOp:1000,rateRV:500},wG:null}
+};
+function calcGgRip(nT,ggOp){return Math.ceil(nT*ggOp/6);}
+function calcGgViag(nT){return 2*nT;}
+function resolveRow(r){
+  const ggRip=r.ggRip!=null?r.ggRip:calcGgRip(r.nT,r.ggOp);
+  const ggViag=r.ggViag!=null?r.ggViag:calcGgViag(r.nT);
+  return{...r,ggRip,ggViag};
+}
+function cCR(r){const rv=resolveRow(r);return rv.nT*(rv.ggOp*rv.rateOp+(rv.ggRip+rv.ggViag)*rv.rateRV);}
+function cGP(rows){const U=resolveRow(rows.U),V=resolveRow(rows.V),W=resolveRow(rows.W);return(U.ggOp*U.nT+U.ggRip+U.ggViag)+(V.ggOp*V.nT+V.ggRip+V.ggViag)+(W.ggOp*W.nT+W.ggRip+W.ggViag);}
+
+let TAR={
+  'United States':{volo:2000,auto:130,hotel:150},'United Kingdom':{volo:800,auto:130,hotel:150},
+  'Ireland':{volo:800,auto:130,hotel:120},'Croatia':{volo:800,auto:130,hotel:120},
+  'Sweden':{volo:800,auto:130,hotel:150},'New Zeland':{volo:2500,auto:130,hotel:150},
+  'Poland':{volo:800,auto:130,hotel:120},'South Africa':{volo:800,auto:130,hotel:150},
+  'France':{volo:800,auto:130,hotel:120},'Ukrain':{volo:800,auto:130,hotel:120},
+  'Turkye':{volo:800,auto:130,hotel:120},'South Korea':{volo:2500,auto:130,hotel:150},
+  'Northern Ireland':{volo:800,auto:130,hotel:120},'Malaysia':{volo:2500,auto:130,hotel:120},
+  'Spain':{volo:800,auto:130,hotel:120},'Vietnam':{volo:2500,auto:130,hotel:120},
+  'Portugal':{volo:800,auto:130,hotel:120},'Jamaica':{volo:2500,auto:130,hotel:120},
+  'Japan':{volo:2500,auto:130,hotel:150},'Hungary':{volo:800,auto:130,hotel:120},
+  'Dominican Republic':{volo:2500,auto:130,hotel:120},'Thailand':{volo:2500,auto:130,hotel:150}
+};
+const TAR_DEFAULT=Object.keys(TAR);
+const MB=[
+{cod:'A',cat:'Unwinder',name:'BD19',mp:50000,om:140,oe:160,opts:[
+{n:'Parent reel trolley (two unwind)',mp:2500,om:0,oe:0},
+{n:'Web tension control by load cell',mp:5000,om:0,oe:0},
+{n:'Parent reel splice detector',mp:500,om:0,oe:0},
+{n:'Automatic paper alignment photocell',mp:500,om:0,oe:0},
+{n:'Automatic web thread with belts',mp:0,om:0,oe:0},
+{n:'Core adaptors 76-250mm (set 4)',mp:3400,om:0,oe:0},
+{n:'Centralized lubrication',mp:0,om:0,oe:0},
+{n:'Custom design on request',mp:0,om:0,oe:0},
+{n:'Pneumatic chucks',mp:8000,om:0,oe:0}
+]},
+{cod:'A',cat:'Unwinder',name:'BD20',mp:60000,om:140,oe:160,opts:[
+{n:'Web tension control by load cell',mp:5000,om:0,oe:0},
+{n:'Shaftless system (Pneumatic chucks)',mp:13500,om:0,oe:0},
+{n:'Awaiting support for mother reel',mp:2300,om:0,oe:0},
+{n:'Core plugs 150mm (set 4)',mp:4200,om:0,oe:0},
+{n:'Core adaptors 160-250mm (set 4)',mp:3800,om:0,oe:0},
+{n:'Core adaptors 250-400mm (set 4)',mp:4700,om:0,oe:0},
+{n:'Automatic paper alignment photocell',mp:500,om:0,oe:0},
+{n:'Parent reel splice detector',mp:500,om:0,oe:0},
+{n:'Elevation kit + founding plates',mp:3000,om:0,oe:0},
+{n:'Core plug trolley',mp:4500,om:0,oe:0},
+{n:'Loading Arms',mp:8000,om:0,oe:0},
+{n:'Servo driven draw unit',mp:0,om:0,oe:0},
+{n:'Awaiting reel support motorized',mp:20000,om:0,oe:0},
+{n:'Unico Zero speed splicing',mp:0,om:0,oe:0},
+{n:'Side Ladder',mp:4500,om:0,oe:0},
+{n:'Cut and Slit + Paper Alignment',mp:25000,om:0,oe:0}
+]},
+{cod:'A',cat:'Unwinder',name:'BD25',mp:65000,om:150,oe:175,opts:[
+{n:'Web tension control by load cell',mp:5000,om:0,oe:0},
+{n:'Shaftless system (Hydraulic chucks)',mp:13500,om:0,oe:0},
+{n:'Core plugs 150mm (set 4)',mp:4200,om:0,oe:0},
+{n:'Core adaptors 160-250mm (set 4)',mp:3800,om:0,oe:0},
+{n:'Elevation kit',mp:3000,om:0,oe:0},
+{n:'Loading Arms',mp:8000,om:0,oe:0},
+{n:'Side Ladder',mp:4500,om:0,oe:0}
+]},
+{cod:'B',cat:'Embosser',name:'AG30',mp:35000,om:40,oe:40,opts:[
+{n:'Automatic centralized lubrication',mp:0,om:0,oe:0},
+{n:'Web break sensors',mp:1000,om:0,oe:5},
+{n:'Non standard pattern engraving',mp:0,om:0,oe:0},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0}
+]},
+{cod:'B',cat:'Embosser',name:'AG35',mp:40000,om:40,oe:40,opts:[
+{n:'Automatic centralized lubrication',mp:0,om:0,oe:0},
+{n:'Web break sensors',mp:1000,om:0,oe:5},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0}
+]},
+{cod:'B',cat:'Embosser',name:'VARIO S',mp:100000,om:120,oe:120,opts:[
+{n:'Automatic centralized lubrication',mp:0,om:0,oe:0},
+{n:'Web break sensors',mp:1000,om:0,oe:5},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0}
+]},
+{cod:'C',cat:'Double Embosser',name:'SIDERIS 50',mp:80000,om:120,oe:120,opts:[
+{n:'Automatic centralized lubrication',mp:0,om:0,oe:0},
+{n:'Ply bonding unit Rollbond 60',mp:12000,om:40,oe:40},
+{n:'Additional embossing station AG 30',mp:35000,om:40,oe:40},
+{n:'Rubber embossing rolls SDA Kit',mp:5000,om:0,oe:0},
+{n:'Fully servo driven motion',mp:11500,om:0,oe:8}
+]},
+{cod:'D',cat:'Embossing Laminator',name:'SIDERIS 40L',mp:160000,om:260,oe:340,opts:[
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Ply bonding unit Rollbond 60',mp:16000,om:20,oe:40},
+{n:'Ply bonding unit Rollbond 70',mp:31000,om:20,oe:40},
+{n:'Additional embossing station AG 35',mp:40000,om:40,oe:40},
+{n:'Web tension control by load cell',mp:4000,om:0,oe:0},
+{n:'Steel Roller',mp:9000,om:0,oe:0},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0}
+]},
+{cod:'D',cat:'Embossing Laminator',name:'SIDERIS 50L',mp:238000,om:320,oe:340,opts:[
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Quick embossing rolls changeover',mp:11500,om:0,oe:0},
+{n:'Ply bonding unit Rollbond 60',mp:16000,om:20,oe:40},
+{n:'Ply bonding unit Rollbond 70',mp:31000,om:20,oe:40},
+{n:'Additional embossing station AG 35',mp:40000,om:40,oe:40},
+{n:'Web tension control by load cell',mp:4500,om:0,oe:0},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0}
+]},
+{cod:'D',cat:'Embossing Laminator',name:'SIDERIS 65L',mp:260000,om:320,oe:340,opts:[
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Ply bonding unit Rollbond 70',mp:31000,om:20,oe:40},
+{n:'Additional embossing station AG 35',mp:40000,om:40,oe:40},
+{n:'Web tension control by load cell',mp:5000,om:0,oe:0},
+{n:'Steel Roller',mp:11500,om:0,oe:0},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0}
+]},
+{cod:'D',cat:'Embossing Laminator',name:'VARIO 50L',mp:320000,om:280,oe:385,opts:[
+{n:'Steel rolls syncronization helical gears',mp:0,om:0,oe:0},
+{n:'Automatic centralized lubrication',mp:0,om:0,oe:0},
+{n:'Custom design on request',mp:0,om:0,oe:0}
+]},
+{cod:'E',cat:'Plybonding Unit',name:'ROLLBOND 60',mp:16000,om:20,oe:40,opts:[
+{n:'Automatic centralized lubrication',mp:0,om:0,oe:0},
+{n:'Web break sensors',mp:1000,om:0,oe:0},
+{n:'Struttura indipendente sulla Testa',mp:4000,om:8,oe:8}
+]},
+{cod:'E',cat:'Plybonding Unit',name:'ROLLBOND 70',mp:31000,om:20,oe:40,opts:[
+{n:'Automatic centralized lubrication',mp:0,om:0,oe:0},
+{n:'Web break sensors',mp:1000,om:0,oe:0},
+{n:'Struttura indipendente sulla Testa',mp:4000,om:8,oe:8}
+]},
+{cod:'F',cat:'Calander',name:'180C',mp:95000,om:200,oe:140,opts:[
+{n:'Automatic centralized lubrication',mp:6000,om:0,oe:16},
+{n:'SDA Kit size settings HMI',mp:4000,om:0,oe:0},
+{n:'Video Camera control',mp:5000,om:0,oe:16},
+{n:'Slitting and Bending unit',mp:15000,om:40,oe:40},
+{n:'Automatic Plies alignment',mp:12000,om:16,oe:16},
+{n:'Log stopper size regulation HMI',mp:1800,om:8,oe:16},
+{n:'Multiple Perforation',mp:1500,om:8,oe:8}
+]},
+{cod:'F',cat:'Calander',name:'250C',mp:105000,om:200,oe:140,opts:[
+{n:'Automatic centralized lubrication',mp:6000,om:0,oe:16},
+{n:'SDA Kit size settings HMI',mp:4000,om:0,oe:0},
+{n:'Video Camera control',mp:5000,om:0,oe:16},
+{n:'Slitting and Bending unit',mp:15000,om:40,oe:40},
+{n:'Automatic Plies alignment',mp:12000,om:16,oe:16},
+{n:'Log stopper size regulation HMI',mp:1800,om:8,oe:16},
+{n:'Multiple Perforation',mp:1500,om:8,oe:8}
+]},
+{cod:'H',cat:'Interfolder',name:'XXX',mp:160000,om:350,oe:250,opts:[
+{n:'Ply bonding unit Rollbond 60',mp:8000,om:24,oe:16},
+{n:'Automatic centralized lubrication',mp:0,om:0,oe:0},
+{n:'Vacuum Pump',mp:25000,om:8,oe:24},
+{n:'Vacuum Pump Inverter',mp:7500,om:0,oe:8}
+]},
+{cod:'H',cat:'Interfolder',name:'V170',mp:222000,om:350,oe:250,opts:[
+{n:'Ply bonding unit Rollbond 60',mp:8000,om:24,oe:16},
+{n:'Automatic centralized lubrication',mp:0,om:0,oe:0},
+{n:'Vacuum Pump',mp:30000,om:8,oe:24},
+{n:'Vacuum Pump Inverter',mp:7500,om:0,oe:8},
+{n:'WEKO Assembly',mp:10000,om:0,oe:0}
+]},
+{cod:'I',cat:'Rewinder',name:'S60',mp:130000,om:325,oe:225,opts:[
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Video Camera control',mp:4000,om:0,oe:0},
+{n:'Core size settings HMI',mp:4500,om:0,oe:0},
+{n:'2nd perforation unit + blade',mp:40000,om:0,oe:0},
+{n:'Ply bonding unit Rollbond 60',mp:16000,om:20,oe:40},
+{n:'Embossing station AG 30',mp:35000,om:40,oe:40},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0}
+]},
+{cod:'I',cat:'Rewinder',name:'S70',mp:145000,om:325,oe:225,opts:[
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Video Camera control',mp:4000,om:0,oe:0},
+{n:'Core size settings HMI',mp:4500,om:0,oe:0},
+{n:'2nd perforation unit + blade',mp:40000,om:0,oe:0},
+{n:'Ply bonding unit Rollbond 60',mp:14000,om:20,oe:40},
+{n:'Embossing station AG 30',mp:35000,om:40,oe:40},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0}
+]},
+{cod:'I',cat:'Rewinder',name:'NEXUS 50C',mp:215000,om:400,oe:300,opts:[
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Video Camera control',mp:4000,om:0,oe:0},
+{n:'2nd perforation unit + blade',mp:40000,om:0,oe:0},
+{n:'Ply bonding unit Rollbond 60',mp:16000,om:20,oe:40},
+{n:'Embossing station AG 30',mp:35000,om:40,oe:40},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0},
+{n:'Coreless',mp:70000,om:60,oe:80}
+]},
+{cod:'I',cat:'Rewinder',name:'NEXUS 50I',mp:210000,om:400,oe:300,opts:[
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Video Camera control',mp:4000,om:0,oe:20},
+{n:'Core size settings HMI',mp:4500,om:0,oe:20},
+{n:'2nd perforation unit + blade',mp:40000,om:0,oe:0},
+{n:'Ply bonding unit Rollbond 60',mp:16000,om:20,oe:40},
+{n:'Embossing station AG 30',mp:35000,om:40,oe:40},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0},
+{n:'Coreless',mp:70000,om:60,oe:80}
+]},
+{cod:'I',cat:'Rewinder',name:'NEXUS 65C',mp:275000,om:650,oe:300,opts:[
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Video Camera control',mp:4000,om:0,oe:0},
+{n:'2nd perf. unit N2 blades + axial roll',mp:40000,om:0,oe:0},
+{n:'Ply bonding unit Rollbond 70 x54',mp:31000,om:20,oe:40},
+{n:'Embossing station AG 35',mp:40000,om:40,oe:40},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0},
+{n:'Ladder',mp:4500,om:0,oe:0},
+{n:'Chucks',mp:5000,om:0,oe:0}
+]},
+{cod:'I',cat:'Rewinder',name:'NEXUS 65I',mp:220000,om:600,oe:300,opts:[
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Video Camera control',mp:4000,om:0,oe:0},
+{n:'Core size settings HMI',mp:4500,om:8,oe:10},
+{n:'2nd perf. unit N2 blades + axial roll',mp:40000,om:0,oe:0},
+{n:'Ply bonding unit Rollbond 70 x54',mp:31000,om:20,oe:40},
+{n:'Embossing station AG 35',mp:40000,om:40,oe:40},
+{n:'Mechanical Engraving',mp:12500,om:0,oe:0},
+{n:'Chemical Engraving',mp:30000,om:0,oe:0},
+{n:'Laser Engraving',mp:20000,om:0,oe:0},
+{n:'Ladder',mp:4500,om:0,oe:0},
+{n:'Chucks',mp:5000,om:0,oe:0},
+{n:'Coreless',mp:70000,om:80,oe:100}
+]},
+{cod:'J',cat:'Tail Sealer',name:'ST8I',mp:50000,om:150,oe:150,opts:[
+{n:'Log diameter regulation HMI',mp:3500,om:8,oe:10},
+{n:'Culled log discharge conveyor',mp:3500,om:8,oe:10}
+]},
+{cod:'J',cat:'Tail Sealer',name:'ST16I',mp:67000,om:180,oe:150,opts:[
+{n:'Log diameter regulation HMI',mp:3500,om:8,oe:10},
+{n:'Culled log discharge conveyor',mp:3500,om:8,oe:10}
+]},
+{cod:'J',cat:'Tail Sealer',name:'ST35C',mp:69000,om:240,oe:150,opts:[
+{n:'Culled log discharge conveyor',mp:3500,om:0,oe:0},
+{n:'Log diameter regulation HMI',mp:3500,om:0,oe:0}
+]},
+{cod:'J',cat:'Tail Sealer',name:'ST50C',mp:73000,om:240,oe:150,opts:[
+{n:'Culled log discharge conveyor',mp:3500,om:0,oe:0},
+{n:'Log diameter regulation HMI',mp:3500,om:0,oe:0}
+]},
+{cod:'K',cat:'Wrapper',name:'WRAPPER',mp:60000,om:150,oe:150,opts:[
+{n:'Log diameter regulation HMI',mp:3500,om:0,oe:0},
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0}
+]},
+{cod:'L',cat:'Log Accumulator',name:'RDT',mp:8500,om:24,oe:40,opts:[]},
+{cod:'L',cat:'Log Accumulator',name:'RDTB',mp:10000,om:24,oe:40,opts:[]},
+{cod:'L',cat:'Log Accumulator',name:'LA35',mp:50000,om:160,oe:100,opts:[
+{n:'Log loading chains',mp:10000,om:0,oe:0}
+]},
+{cod:'L',cat:'Log Accumulator',name:'LA40',mp:60000,om:160,oe:100,opts:[
+{n:'Log loading chains',mp:12500,om:0,oe:0},
+{n:'Double logsaw unloading',mp:40000,om:0,oe:0}
+]},
+{cod:'L',cat:'Log Accumulator',name:'LA150',mp:50000,om:260,oe:100,opts:[
+{n:'Log loading chains',mp:12500,om:0,oe:0}
+]},
+{cod:'L',cat:'Log Accumulator',name:'LA250',mp:70000,om:280,oe:120,opts:[
+{n:'Log loading chains',mp:12500,om:0,oe:0}
+]},
+{cod:'M',cat:'Logsaw',name:'ENSIS 150',mp:63000,om:220,oe:140,opts:[
+{n:'Additional set of clamps',mp:1000,om:0,oe:0},
+{n:'Grinding dust removal system',mp:15000,om:10,oe:10},
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'High efficiency clamp system',mp:5000,om:0,oe:0},
+{n:'Soundproof enclosure',mp:7500,om:0,oe:0},
+{n:'Infeed log top guide',mp:1000,om:0,oe:0},
+{n:'Automatic blade wear compensation',mp:1000,om:0,oe:0},
+{n:'Cookies reject elevator (2 containers)',mp:3500,om:0,oe:0},
+{n:'Boom arm HMI',mp:2500,om:0,oe:0}
+]},
+{cod:'M',cat:'Logsaw',name:'T35',mp:105000,om:275,oe:185,opts:[
+{n:'Additional set of clamps',mp:1000,om:0,oe:0},
+{n:'Grinding dust removal system',mp:15000,om:10,oe:10},
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'High efficiency clamp system',mp:5000,om:0,oe:0},
+{n:'Soundproof enclosure',mp:7500,om:0,oe:0}
+]},
+{cod:'M',cat:'Logsaw',name:'UNICO365',mp:115000,om:275,oe:185,opts:[
+{n:'Additional set of clamps',mp:1000,om:0,oe:0},
+{n:'Grinding dust removal system',mp:15000,om:10,oe:10},
+{n:'Soundproof enclosure',mp:7500,om:0,oe:0},
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Infeed log top guide',mp:1000,om:0,oe:0},
+{n:'Automatic blade wear compensation',mp:1000,om:0,oe:0},
+{n:'Cookies reject elevator (2 containers)',mp:3500,om:0,oe:0},
+{n:'Boom arm HMI',mp:2500,om:0,oe:0}
+]},
+{cod:'M',cat:'Logsaw',name:'GLADIUS250',mp:205000,om:500,oe:250,opts:[
+{n:'Mechanic clamps system',mp:750,om:0,oe:0},
+{n:'Grinding dust removal system',mp:15000,om:10,oe:10},
+{n:'Automatic centralized lubrication',mp:500,om:0,oe:0},
+{n:'Loading table',mp:8500,om:0,oe:80},
+{n:'Max log larger diameter on 2 external lanes 160/220mm',mp:5000,om:0,oe:0},
+{n:'Universal clamps 160-220 on two external lanes',mp:1500,om:0,oe:0}
+]},
+{cod:'N',cat:'Coremaker',name:'CW60I',mp:45000,om:75,oe:190,opts:[
+{n:'Additional mandrel',mp:500,om:0,oe:0},
+{n:'LoCore configuration ID 19/90mm',mp:6500,om:0,oe:0},
+{n:'Core bin',mp:6500,om:0,oe:0}
+]},
+{cod:'N',cat:'Coremaker',name:'CW130C',mp:56000,om:75,oe:190,opts:[
+{n:'Additional mandrel',mp:500,om:0,oe:0},
+{n:'LoCore configuration ID 19/90mm',mp:6500,om:0,oe:0},
+{n:'Core bin',mp:6500,om:0,oe:0}
+]},
+{cod:'N',cat:'Coremaker',name:'CW160C',mp:65000,om:85,oe:200,opts:[
+{n:'Additional mandrel',mp:500,om:0,oe:0},
+{n:'LoCore configuration ID 19/90mm',mp:6500,om:0,oe:0}
+]},
+{cod:'O',cat:'Coremaker Backstand',name:'CWB60C',mp:35000,om:30,oe:50,opts:[
+{n:'Perforation system center pull',mp:8500,om:8,oe:8},
+{n:'Additional glue units +2',mp:6500,om:8,oe:8},
+{n:'Printing unit',mp:8000,om:8,oe:8}
+]},
+{cod:'O',cat:'Coremaker Backstand',name:'CWB130C',mp:45000,om:30,oe:50,opts:[
+{n:'Flying Splice',mp:1500,om:8,oe:8},
+{n:'Ply alignment system single ply',mp:1500,om:8,oe:8},
+{n:'Additional unit +2 reels support',mp:11500,om:8,oe:8},
+{n:'Additional glue unit',mp:6500,om:8,oe:8}
+]},
+{cod:'Q1',cat:'Line Electrical Cabinet',name:'START AND STOP',mp:0,om:0,oe:160,opts:[
+{n:'Unwinder',mp:7000,om:0,oe:0,hasQty:true},
+{n:'Laminator',mp:23000,om:0,oe:0,hasQty:true},
+{n:'Rewinder',mp:40000,om:0,oe:0,hasQty:true},
+{n:'Tail Sealer',mp:8500,om:0,oe:0,hasQty:true},
+{n:'Log Accumulator',mp:8500,om:0,oe:0,hasQty:true},
+{n:'Stand alone Cabinet',mp:5000,om:0,oe:0,hasQty:true}
+]},
+{cod:'Q1',cat:'Line Electrical Cabinet',name:'INDUSTRIAL',mp:0,om:0,oe:240,opts:[
+{n:'Unwinder',mp:7000,om:0,oe:0,hasQty:true},
+{n:'Laminator',mp:23000,om:0,oe:0,hasQty:true},
+{n:'Rewinder',mp:40000,om:0,oe:0,hasQty:true},
+{n:'Tail Sealer',mp:8500,om:0,oe:0,hasQty:true},
+{n:'Log Accumulator',mp:8500,om:0,oe:0,hasQty:true},
+{n:'Stand alone Cabinet',mp:5000,om:0,oe:0,hasQty:true}
+]},
+{cod:'Q1',cat:'Line Electrical Cabinet',name:'CONSUMER',mp:0,om:0,oe:260,opts:[
+{n:'Unwinder',mp:7000,om:0,oe:0,hasQty:true},
+{n:'Laminator',mp:27500,om:0,oe:0,hasQty:true},
+{n:'Rewinder',mp:50000,om:0,oe:0,hasQty:true},
+{n:'Tail Sealer',mp:10500,om:0,oe:0,hasQty:true},
+{n:'Log Accumulator',mp:9500,om:0,oe:0,hasQty:true},
+{n:'Stand alone Cabinet',mp:5000,om:0,oe:0,hasQty:true}
+]},
+{cod:'Q2',cat:'Logsaw Electrical Cabinet',name:'LOGSAW CABINET',mp:30000,om:0,oe:80,opts:[]},
+{cod:'Q3',cat:'Coremaker Electrical Cabinet',name:'COREMAKER CABINET',mp:16000,om:0,oe:40,opts:[]},
+{cod:'Q4',cat:'Vacuum Pump Electrical Cabinet',name:'VACUUM PUMP CABINET',mp:8000,om:0,oe:20,opts:[]},
+{cod:'R',cat:'Guardings and Wirings',name:'BASE GUARDING AND WIRING',mp:7500,om:80,oe:80,opts:[
+{n:'Soundproof enclosure',mp:11000,om:16,oe:16}
+]},
+{cod:'R',cat:'Guardings and Wirings',name:'START AND STOP GUARDINGS AND WIRINGS',mp:30000,om:180,oe:280,opts:[
+{n:'Soundproof enclosure',mp:11000,om:16,oe:16}
+]},
+{cod:'R',cat:'Guardings and Wirings',name:'INDUSTRIAL GUARDINGS AND WIRINGS',mp:35000,om:200,oe:300,opts:[
+{n:'Soundproof enclosure',mp:11000,om:16,oe:16}
+]},
+{cod:'R',cat:'Guardings and Wirings',name:'CONSUMER GUARDINGS AND WIRINGS',mp:50000,om:200,oe:400,opts:[
+{n:'Soundproof enclosure',mp:11000,om:16,oe:16}
+]},
+{cod:'R',cat:'Guardings and Wirings',name:'CONSUMER PLUS GUARDINGS AND WIRINGS',mp:65000,om:200,oe:400,opts:[
+{n:'Soundproof enclosure',mp:11000,om:16,oe:16}
+]}
+];
+
+const TIPI=[{id:0,label:'Start & Stop'},{id:1,label:'Industriale'},{id:2,label:'Consumer'},{id:3,label:'Interfogliato'},{id:4,label:'Altro'}];
+const TECHS=[{id:0,label:'Siemens'},{id:1,label:'Rockwell'},{id:2,label:'Altro'}];
+const CD={EUR:{sym:'€',rate:1},USD:{sym:'$',rate:1.18},GBP:{sym:'£',rate:0.87}};
+const SM={bozza:{l:'Bozza',bg:'#F2F2F0',c:'#3D3D3C',b:'#D5D3CE'},revisione:{l:'In revisione',bg:'#FDF3E3',c:'#7A4800',b:'#F08A05'},approvazione:{l:'In approvazione',bg:'#E8EFF7',c:'#1a4f82',b:'#2a7ac4'},approvato:{l:'Approvato',bg:'#E8F5E3',c:'#1a5212',b:'#3d9e28'},emesso:{l:'Emesso',bg:'#F0EDF8',c:'#3a2a7c',b:'#6c5cbf'}};
+const STEPS=[{id:'cliente',lbl:'Cliente'},{id:'moduli',lbl:'Config. Linea FAT'},{id:'commissioning',lbl:'Commissioning'},{id:'variazioni',lbl:'Variazioni'},{id:'anteprima',lbl:'Anteprima Offerta'},{id:'approvazione',lbl:'Approvazione'},{id:'offerta',lbl:'Offerta Finale'}];
+function getCurr(q){const code=q.currency||'EUR';const rate=code==='EUR'?1:((q.rates||{})[code]||CD[code]?.rate||1);return{code,sym:CD[code]?.sym||'€',rate};}
+function tL(id){return id!=null?TIPI.find(t=>t.id===id)?.label||'':'';}
+function techL(id){return id!=null?TECHS.find(t=>t.id===id)?.label||'':'';}
+function cCV(rows,paese,comm){const t=TAR[paese];if(!t)return null;const gA=(rows.U.ggOp+rows.U.ggRip+rows.U.ggViag)+(rows.V.ggOp+rows.V.ggRip+rows.V.ggViag)+(rows.W.ggOp+rows.W.ggRip+rows.W.ggViag);const gH=cGP(rows);const nMax=Math.max(rows.U.nT,rows.V.nT,rows.W.nT);const nTot=rows.U.nT+rows.V.nT+rows.W.nT;const rA=(comm&&comm.cv_rate_auto!=null)?comm.cv_rate_auto:t.auto;const rH=(comm&&comm.cv_rate_hotel!=null)?comm.cv_rate_hotel:t.hotel;const rV=(comm&&comm.cv_rate_volo!=null)?comm.cv_rate_volo:t.volo;const rT=(comm&&comm.cv_rate_taxi!=null)?comm.cv_rate_taxi:300;return{cA:gA*rA,cH:gH*rH,cV:nTot*rV,cT:nTot*rT,gA,gH,nMax,nTot,t,rA,rH,rV,rT};}
+function cMP(sel,q){const b=MB[sel.midx];if(!b)return null;const mp=sel.mp!=null?sel.mp:b.mp,om=sel.om!=null?sel.om:b.om,oe=sel.oe!=null?sel.oe:b.oe,qty=sel.qty||0;let tMP=mp,tOM=om,tOE=oe;(sel.opts||[]).forEach((on,j)=>{if(!on||j>=b.opts.length)return;const ov=(sel.optOverrides||{})[j];const oqty=(sel.optQty||{})[j]||1;tMP+=(ov?.mp!=null?ov.mp:b.opts[j].mp)*oqty;tOM+=(ov?.om!=null?ov.om:b.opts[j].om)*oqty;tOE+=(ov?.oe!=null?ov.oe:b.opts[j].oe)*oqty;});if(sel.customOpt?.on&&sel.customOpt?.mp)tMP+=sel.customOpt.mp;const mu=getMarkup(b.cod,q.lineaTechId??null);const tMPw=Math.round(tMP*(1+mu));const tot=(tMPw*qty)+(tOM+tOE)*qty*q.rateH;const m=q.margine/100,p=q.provv/100,a=q.altro/100;const pMin=m<1?Math.round(tot/(1-m)):tot,pProv=p<1?Math.round(pMin/(1-p)):pMin,pAlt=a<1?Math.round(pProv/(1-a)):pProv;return{tot,pMin,pProv,pAlt,tOM,tOE,tMP:tMPw,tMPraw:tMP,mu};}
+function cMO(q){
+  var allMPraw=0,allMPrawNoMu=0,allL=0,totOM=0,totOE=0;
+  (q.selMods||[]).forEach(function(sel){
+    if(!sel.qty)return;var r=cMP(sel,q);if(!r)return;
+    allMPraw+=r.tMP*sel.qty;
+    allMPrawNoMu+=r.tMPraw*sel.qty;
+    allL+=(r.tOM+r.tOE)*sel.qty*q.rateH;
+    totOM+=r.tOM*sel.qty;totOE+=r.tOE*sel.qty;
+  });
+  var c=q.comm||{};
+  var y_om=c.y_om!=null?c.y_om:Math.round(totOM*0.30);
+  var y_oe=c.y_oe!=null?c.y_oe:Math.round(totOE*0.30);
+  var y_mp=c.y_mp!=null?c.y_mp:1500;
+  var yCost=y_mp+(y_om+y_oe)*q.rateH;
+  var tia_mp=c.tia_mp!=null?c.tia_mp:Math.round(allMPraw*0.02);
+  var co_mp=c.co_mp!=null?c.co_mp:Math.round(allMPraw*0.022);
+  var met=Math.max(Math.round(allMPraw*0.012),2000);
+  var costoBase=allMPraw+allL+yCost+tia_mp+co_mp;
+  var m=q.margine/100,p=q.provv/100,a=q.altro/100;
+  var pL=m<1?Math.round(costoBase/(1-m)):costoBase;
+  // Prezzo linea con provv e leva (senza GAR) — base per calcolo GAR
+  // MET non marginalizzato ma segue provv e leva
+  var pLprov=p<1?Math.round((pL+met)/(1-p)):(pL+met);
+  var totAlt_pre=a<1?Math.round(pLprov/(1-a)):pLprov;
+  // GAR = 2,1% su prezzo linea con leva (calcolato in cAll)
+  var garBase=0;
+  var totAlt=totAlt_pre+garBase;
+  // Per retrocompatibilità con cAll che usa pLinea/totProv/totAlt
+  var costoMP=allMPraw+y_mp+tia_mp+co_mp;
+  var costoMPtot=costoMP+garBase;
+  var margineMP=pL>0?Math.round((1-(costoMP/pL))*1000)/10:0;
+  var totOreM=totOM+y_om,totOreE=totOE+y_oe;
+  var costoOre=(totOreM+totOreE)*q.rateH;
+  var costoTotBanner=costoBase+garBase+met;
+  return{
+    allMP:costoBase,allMPraw:allMPraw,allMPrawNoMu:allMPrawNoMu,allL:allL,
+    pLinea:pL,garPL:garBase,garBase:garBase,met:met,
+    totProv:pLprov,totAlt:totAlt,totOM:totOM,totOE:totOE,
+    y_om:y_om,y_oe:y_oe,y_mp:y_mp,yCost:yCost,tia_mp:tia_mp,co_mp:co_mp,
+    costoMP:costoMP,costoMPtot:costoMPtot,margineMP:margineMP,
+    totOreM:totOreM,totOreE:totOreE,costoOre:costoOre,
+    costoBase:costoBase,costoTotBanner:costoTotBanner,
+    totAlt_pre:totAlt_pre,
+  };
+}
+
+function mkRows(id){var d=COMM_DEF[id!=null?id:4];return{U:{...d.U},V:{...d.V},W:{...d.W}};}
+
+function cS(q){
+  var c=q.comm,rows=c.rows;
+  var suC=(c.su_om+c.su_oe)*q.rateH*c.su_qty;
+  var smC=(c.sm_om+c.sm_oe)*q.rateH*c.sm_qty;
+  var commU=cCR(rows.U),commV=cCR(rows.V),commW=cCR(rows.W);
+  var commTot=commU+commV+commW;
+  var tivC=c.tiv_qty*c.tiv_unit;
+  var cv=cCV(rows,q.clientNazione||'',q.comm);
+  var cvTot=cv?((c.cv_auto!==false?cv.cA:0)+(c.cv_hotel!==false?cv.cH:0)+(c.cv_voli!==false?cv.cV:0)+(c.cv_taxi!==false?cv.cT:0)):0;
+  return{suC:suC,smC:smC,commU:commU,commV:commV,commW:commW,commTot:commTot,tivC:tivC,costiViviTot:cvTot,cv:cv};
+}
+
+function cAll(q){
+  var mod=cMO(q),serv=cS(q);
+  var met=mod.met;
+  var suC=serv.suC,smC=serv.smC;
+  // GAR = 2.1% × (pLinea_leva + S + T + Y + TIA + CO)
+  var m=q.margine/100,p=q.provv/100,a=q.altro/100;
+  var pLeva=a<1?Math.round((p<1?Math.round(mod.pLinea/(1-p)):mod.pLinea)/(1-a)):(p<1?Math.round(mod.pLinea/(1-p)):mod.pLinea);
+  var garBase=Math.round((mod.pLinea+serv.commTot+serv.tivC+serv.costiViviTot)*0.021);
+  var totS=suC+smC+serv.commTot+serv.tivC+garBase+met+serv.costiViviTot;
+  var tot=mod.pLinea+totS;
+  var tP=p<1?Math.round(tot/(1-p)):tot;
+  var tA=a<1?Math.round(tP/(1-a)):tP;
+  return Object.assign({},mod,serv,{met:met,gar:garBase,totServizi:totS,totale:tot,totProv:tP,totAlt:tA});
+}
+
+function mkQ(ov={}){return{id:Date.now().toString(),ver:1,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),status:'bozza',cfok:false,admk:false,cfokTs:null,admkTs:null,cfokLog:null,admkLog:null,clientName:'',clientRef:'',clientNazione:'',propNum:'',notes:'',lineaTipoId:null,lineaTechId:null,rateH:35,margine:35,provv:0,altro:5,currency:'EUR',rates:{USD:1.18,GBP:0.87},selMods:[],variazioni:[],comm:{su_qty:1,su_om:300,su_oe:300,sm_qty:1,sm_om:100,sm_oe:100,y_om:null,y_oe:null,y_mp:null,tia_mp:null,co_mp:null,tiv_qty:0,tiv_unit:6000,cv_auto:true,cv_hotel:true,cv_voli:true,cv_taxi:true,rows:mkRows(null)},...ov};}
+let S={pg:'list',quotes:[],qid:null,step:'cliente',srch:'',grp:{},mod:{},loading:true,suggFiltro:null,suggTipoId:null,showRateForm:false,rateFormNazione:'',otpModal:null,showJsonModal:false,confirmModal:null,autoLinkMsg:null};
+function boot(){const d=lsGet();S.quotes=d.quotes||[];if(d.extraTAR)Object.assign(TAR,d.extraTAR);S.quotes=S.quotes.map(q=>{if(!q.comm.rows)q.comm.rows=mkRows(q.lineaTipoId);['U','V','W'].forEach(a=>{if(q.comm.rows[a].rateOp==null)q.comm.rows[a].rateOp=1000;if(q.comm.rows[a].rateRV==null)q.comm.rows[a].rateRV=500;});if(q.comm.y_om===undefined)q.comm.y_om=null;if(q.comm.y_oe===undefined)q.comm.y_oe=null;if(q.comm.y_mp===undefined)q.comm.y_mp=null;if(q.comm.tia_mp===undefined)q.comm.tia_mp=null;if(q.comm.co_mp===undefined)q.comm.co_mp=null;if(q.comm.su_om===undefined){const od={0:320,1:320,2:400,3:400};q.comm.su_om=od[q.lineaTipoId]||300;}if(q.comm.su_oe===undefined){const od={0:320,1:320,2:400,3:400};q.comm.su_oe=od[q.lineaTipoId]||300;}if(q.comm.sm_om===undefined){const od={2:270};q.comm.sm_om=od[q.lineaTipoId]||100;}if(q.comm.sm_oe===undefined){const od={2:190};q.comm.sm_oe=od[q.lineaTipoId]||100;}if(q.comm.su_qty===undefined)q.comm.su_qty=1;if(q.comm.sm_qty===undefined)q.comm.sm_qty=1;if(q.comm.cv_auto===undefined)q.comm.cv_auto=true;if(q.comm.cv_rate_auto===undefined)q.comm.cv_rate_auto=null;if(q.comm.cv_rate_hotel===undefined)q.comm.cv_rate_hotel=null;if(q.comm.cv_rate_volo===undefined)q.comm.cv_rate_volo=null;if(q.comm.cv_rate_taxi===undefined)q.comm.cv_rate_taxi=null;['U','V','W'].forEach(function(a){var r=q.comm.rows[a];if(r.ggViag!=null&&r.ggViag===2*r.nT){r.ggViag=null;}if(r.ggRip!=null){r.ggRip=null;}});if(q.comm.cv_hotel===undefined)q.comm.cv_hotel=true;if(q.comm.cv_voli===undefined)q.comm.cv_voli=true;if(q.comm.cv_taxi===undefined)q.comm.cv_taxi=true;if(!q.cfokTs)q.cfokTs=null;if(!q.admkTs)q.admkTs=null;if(!q.cfokLog)q.cfokLog=null;if(!q.admkLog)q.admkLog=null;return q;});S.loading=false;paint();}
+function save(){const extraTAR={};Object.entries(TAR).forEach(([k,v])=>{if(!TAR_DEFAULT.includes(k))extraTAR[k]=v;});lsSet({quotes:S.quotes,extraTAR});}
+function set(p){Object.assign(S,p);paint();}
+function Q(){return S.quotes.find(q=>q.id===S.qid);}
+function upQ(p){S.quotes=S.quotes.map(q=>q.id===S.qid?{...q,...p,updatedAt:new Date().toISOString()}:q);save();paint();}
+function upQF(p){S.quotes=S.quotes.map(q=>q.id===S.qid?{...q,...p,updatedAt:new Date().toISOString()}:q);save();paint();}
+function upC(f,v){const q=Q();upQF({comm:{...q.comm,[f]:parseN(v)}});}
+function resetY(){const q=Q();upQF({comm:{...q.comm,y_om:null,y_oe:null,y_mp:null}});}
+function resetTia(){const q=Q();upQF({comm:{...q.comm,tia_mp:null}});}
+function resetCo(){const q=Q();upQF({comm:{...q.comm,co_mp:null}});}
+function upCF(f,v){const q=Q();upQF({comm:{...q.comm,[f]:parseFloat(String(v).replace(',','.'))||0}});}
+function upRate(code,v){const q=Q();upQF({rates:{...q.rates,[code]:parseFloat(String(v).replace(',','.'))||CD[code].rate}});}
+function upRow(act,field,val){
+  const q=Q();if(!q)return;
+  const newVal=parseN(val);
+  let newRow={...q.comm.rows[act],[field]:newVal};
+  // Se cambio nT o ggOp e ggRip/ggViag sono in modalità auto (null), 
+  // li manteniamo null così si ricalcolano automaticamente
+  // Se invece l'utente ha già forzato ggRip/ggViag manualmente li lasciamo
+  const rows={...q.comm.rows,[act]:newRow};
+  upQF({comm:{...q.comm,rows}});const def=q.lineaTipoId!=null?COMM_DEF[q.lineaTipoId]:null;if(!def?.wG)return;const gp=cGP(rows);document.getElementById('cw')?.remove();if(gp<def.wG){const nm=['Start & Stop','Industriale','Consumer','Interfogliato','Altro'];const d=document.createElement('div');d.id='cw';d.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:9999;background:#fff;border:1.5px solid #F08A05;border-radius:6px;padding:14px 20px;max-width:500px;box-shadow:0 4px 16px rgba(0,0,0,0.13);font-family:Barlow,sans-serif;font-size:13px;color:#3D3D3C;display:flex;gap:12px;align-items:flex-start';d.innerHTML=`<i class="ti ti-alert-triangle" style="color:#F08A05;font-size:18px;flex-shrink:0;margin-top:1px"></i><div style="flex:1"><div style="font-weight:600;margin-bottom:4px;color:#7A4800">Attenzione — giorni commissioning</div><div>Standard <strong>${nm[q.lineaTipoId]}</strong>: <strong>${def.wG}</strong> gg-pax. Attuale: <strong>${gp}</strong>.</div><div style="margin-top:10px;display:flex;gap:8px"><button onclick="document.getElementById('cw').remove()" style="font-size:11px;font-weight:700;text-transform:uppercase;padding:5px 14px;background:#F08A05;color:#fff;border:none;border-radius:3px;cursor:pointer">OK</button><button onclick="document.getElementById('cw').remove()" style="padding:5px 14px;border:1px solid #D5D3CE;border-radius:3px;cursor:pointer">Chiudi</button></div></div>`;document.body.appendChild(d);setTimeout(()=>d.remove(),15000);}}
+function upSel(si,p){const q=Q();const s=[...q.selMods];s[si]={...s[si],...p};upQF({selMods:s});}
+function upSelOpt(si,oi,v){const q=Q();const s=[...q.selMods];const o=[...(s[si].opts||[])];o[oi]=v;s[si]={...s[si],opts:o};upQF({selMods:s});}
+function upSelOptVal(si,oi,mp){const q=Q();const s=[...q.selMods];const c=s[si];const ov={...(c.optOverrides||{}),[oi]:{...((c.optOverrides||{})[oi]||{}),mp:parseN(mp)}};s[si]={...c,optOverrides:ov};upQF({selMods:s});}
+function upSelOptQty(si,oi,qty){const q=Q();const s=[...q.selMods];const c=s[si];const oq={...(c.optQty||{}),[oi]:Math.max(1,parseN(qty)||1)};s[si]={...c,optQty:oq};upQF({selMods:s});}
+function upSelCustomOpt(si,field,val){const q=Q();const s=[...q.selMods];const co={...(s[si].customOpt||{})};if(field==='mp')co.mp=parseN(val);else if(field==='note')co.note=val;else if(field==='on')co.on=val;s[si]={...s[si],customOpt:co};upQF({selMods:s});}
+function autoLink(selMods){
+  // Trova indici Q2 e Q3 nel catalogo MB
+  var q2idx=MB.findIndex(function(b){return b.cod==='Q2';});
+  var q3idx=MB.findIndex(function(b){return b.cod==='Q3';});
+  var hasM=selMods.some(function(s){return s.qty>0&&MB[s.midx]&&MB[s.midx].cod==='M';});
+  var hasN=selMods.some(function(s){return s.qty>0&&MB[s.midx]&&MB[s.midx].cod==='N';});
+  var hasQ2=selMods.some(function(s){return s.qty>0&&MB[s.midx]&&MB[s.midx].cod==='Q2';});
+  var hasQ3=selMods.some(function(s){return s.qty>0&&MB[s.midx]&&MB[s.midx].cod==='Q3';});
+  var msgs=[];
+  var result=[].concat(selMods);
+  if(hasM&&!hasQ2&&q2idx>=0){
+    var b2=MB[q2idx];
+    result.push({midx:q2idx,qty:1,mp:b2.mp,om:b2.om,oe:b2.oe,opts:[],optOverrides:{},optQty:{}});
+    msgs.push('Quadro Troncatore (Q2) aggiunto automaticamente perché è presente un modulo Troncatore (M)');
+  }
+  if(hasN&&!hasQ3&&q3idx>=0){
+    var b3=MB[q3idx];
+    result.push({midx:q3idx,qty:1,mp:b3.mp,om:b3.om,oe:b3.oe,opts:[],optOverrides:{},optQty:{}});
+    msgs.push('Quadro Tubiera (Q3) aggiunto automaticamente perché è presente un modulo Tubiera (N)');
+  }
+  // Rimuovi Q2 se non ci sono più M
+  if(!hasM&&hasQ2){
+    result=result.filter(function(s){return !(MB[s.midx]&&MB[s.midx].cod==='Q2');});
+    msgs.push('Quadro Troncatore (Q2) rimosso automaticamente: nessun modulo Troncatore (M) presente');
+  }
+  // Rimuovi Q3 se non ci sono più N
+  if(!hasN&&hasQ3){
+    result=result.filter(function(s){return !(MB[s.midx]&&MB[s.midx].cod==='Q3');});
+    msgs.push('Quadro Tubiera (Q3) rimosso automaticamente: nessun modulo Tubiera (N) presente');
+  }
+  if(msgs.length>0){S.autoLinkMsg=msgs.join(' | ');setTimeout(function(){S.autoLinkMsg=null;paint();},6000);}
+  return result;
+}
+function setQty(midx,val){const qty=Math.max(0,parseN(val)),q=Q();const s=[...q.selMods];const ex=s.findIndex(x=>x.midx===midx);if(qty===0){if(ex>=0)s.splice(ex,1);}else if(ex>=0){s[ex]={...s[ex],qty};}else{const b=MB[midx];s.push({midx,qty,mp:b.mp,om:b.om,oe:b.oe,opts:[],optOverrides:{},optQty:{}});}var sl2=autoLink(s);upQF({selMods:sl2});paint();}
+function addV(v){const q=Q();upQF({variazioni:[...(q.variazioni||[]),v]});}
+function upV(i,p){const q=Q();const vs=[...(q.variazioni||[])];vs[i]={...vs[i],...p};upQF({variazioni:vs});}
+function delV(i){const q=Q();upQF({variazioni:(q.variazioni||[]).filter((_,x)=>x!==i)});}
+function setTipo(id){const q=Q();if(!q)return;const ore={0:{su_om:320,su_oe:320,sm_om:100,sm_oe:100},1:{su_om:320,su_oe:320,sm_om:100,sm_oe:100},2:{su_om:400,su_oe:400,sm_om:270,sm_oe:190},3:{su_om:400,su_oe:400,sm_om:100,sm_oe:100}}[id]||{};upQF({lineaTipoId:id,comm:{...q.comm,rows:mkRows(id),...ore}});Object.assign(S,{suggFiltro:id===4?false:null,suggTipoId:id});paint();}
+function setTech(id){upQF({lineaTechId:id});}
+function rispondiFiltro(si){Object.assign(S,{suggFiltro:si});paint();}
+function selNazione(paese){if(!paese)return;upQ({clientNazione:paese});if(!TAR[paese]){Object.assign(S,{showRateForm:true,rateFormNazione:paese});paint();}else{Object.assign(S,{showRateForm:false,rateFormNazione:''});paint();}}
+function salvaTariffe(){const paese=S.rateFormNazione;const volo=parseN(document.getElementById('rf-volo')?.value)||0;const auto=parseN(document.getElementById('rf-auto')?.value)||0;const hotel=parseN(document.getElementById('rf-hotel')?.value)||0;if(!paese||!volo||!auto||!hotel){alert('Inserisci tutti e tre i valori.');return;}TAR[paese]={volo,auto,hotel};Object.assign(S,{showRateForm:false,rateFormNazione:''});save();paint();}
+async function richiestaOTP(role){
+  const q=Q();if(!q)return;
+  const approver=APPROVERS[role];
+  const code=otpGenerate(q.id,role);
+  const t=cAll(q);
+  const cur=getCurr(q);
+  const cr=cur.code==='EUR'?1:cur.rate;
+  const exp=new Date(Date.now()+OTP_VALIDITY_MS);
+  const expStr=exp.toLocaleDateString('it-IT')+' alle '+exp.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+
+  // ── Calcolo totComm (coerente con sezione 5 Anteprima) ──
+  const _mod=cMO(q),_serv=cS(q),_m=q.margine/100,_p=q.provv/100,_a=q.altro/100;
+  const _pL=_m<1?Math.round((_mod.costoBase+_serv.suC+_serv.smC)/(1-_m)):(_mod.costoBase+_serv.suC+_serv.smC);
+  const _garC=Math.round((_pL+_serv.commTot+_serv.tivC+_serv.costiViviTot)*0.021);
+  const _garM=_m<1?Math.round(_garC/(1-_m)):_garC;
+  const _sub=_pL+_mod.met+_garM;
+  const _subP=_p<1?Math.round(_sub/(1-_p)):_sub;
+  const _totFin=_a<1?Math.round(_subP/(1-_a)):_subP;
+  const _cvT=_serv.commTot+_serv.tivC+_serv.costiViviTot;
+  const _cvP=_p<1?Math.round(_cvT/(1-_p)):_cvT;
+  const _cvA=_a<1?Math.round(_cvP/(1-_a)):_cvP;
+  const _totComm=_totFin+_cvA;
+  const _pv=(v)=>{const pp=_p<1?Math.round(v/(1-_p)):v;return _a<1?Math.round(pp/(1-_a)):pp;};
+  const _sM=(q.selMods||[]).filter(s=>s.qty>0);
+  const _sumModsAlt=_sM.reduce((acc,sel)=>{const rm=cMP(sel,q);return acc+(rm?rm.pAlt*sel.qty:0);},0);
+  const _ytiacoCosto=_mod.yCost+_mod.tia_mp+_mod.co_mp;
+  const _ytiacoMarg=_m<1?Math.round(_ytiacoCosto/(1-_m)):_ytiacoCosto;
+  const _garMargLeva=_p<1?Math.round(_garM/(1-_p)):_garM;
+  const _garFinLeva=_a<1?Math.round(_garMargLeva/(1-_a)):_garMargLeva;
+
+  // ── Riepilogo economico (uguale sezione 5) ──
+  const _pp=(v)=>_p<1?Math.round(v/(1-_p)):v;
+  const righeEco=[
+    ['Moduli e Optional',       fmtE(_sM.reduce((a,s)=>{const rm=cMP(s,q);return a+(rm?rm.pMin*s.qty:0);},0)),  fmtE(_pp(_sM.reduce((a,s)=>{const rm=cMP(s,q);return a+(rm?rm.pMin*s.qty:0);},0))),  fmtE(_sumModsAlt)],
+    ['Ore Gen., TIA e CO',      fmtE(_ytiacoMarg),                                                                fmtE(_pp(_ytiacoMarg)),                                                              fmtE(_pv(_ytiacoMarg))],
+    ['FAT (S+T)',                fmtE(_serv.suC+_serv.smC),                                                       fmtE(_pp(_serv.suC+_serv.smC)),                                                      fmtE(_pv(_serv.suC+_serv.smC))],
+    ['Commissioning',            fmtE(_serv.commTot),                                                              fmtE(_pp(_serv.commTot)),                                                             fmtE(_pv(_serv.commTot))],
+    ['Costi vivi',               fmtE(_serv.costiViviTot),                                                        fmtE(_pp(_serv.costiViviTot)),                                                        fmtE(_pv(_serv.costiViviTot))],
+    ['Trasporti TIV',            fmtE(_serv.tivC),                                                                fmtE(_pp(_serv.tivC)),                                                               fmtE(_pv(_serv.tivC))],
+    ['Garanzie GAR',             fmtE(_garM),                                                                     fmtE(_pp(_garM)),                                                                    fmtE(_garFinLeva)],
+    ['Manuali MET',              fmtE(_mod.met),                                                                  fmtE(_pp(_mod.met)),                                                                 fmtE(_pv(_mod.met))],
+  ];
+  const totEUR=fmtE(_totComm);
+  const totCur=cur.code!=='EUR'?`${cur.sym} ${Math.round(_totComm*cr).toLocaleString('it-IT')} (${cur.code})`:'';
+  const W=38,W2=14;
+  const ecoLines=[
+    '  '+' '.repeat(W)+'BASE'.padStart(W2)+'+PROVV.'.padStart(W2)+('+LEVA').padStart(W2),
+    '  '+'-'.repeat(W+W2*3),
+    ...righeEco.map(([l,b,pp,lv])=>'  '+l.padEnd(W)+b.padStart(W2)+pp.padStart(W2)+lv.padStart(W2)),
+    '  '+'-'.repeat(W+W2*3),
+    '  '+'TOTALE OFFERTA'.padEnd(W)+' '.repeat(W2)+' '.repeat(W2)+totEUR.padStart(W2),
+  ].join('\n');
+
+  // ── Moduli selezionati (include Extra Custom) ──
+  const moduLines=_sM.map(sel=>{
+    const b=MB[sel.midx];if(!b)return'';
+    const r=cMP(sel,q);
+    const opts=b.opts.filter((_,i)=>(sel.opts||[])[i]).map(o=>o.n);
+    if(sel.customOpt&&sel.customOpt.on)opts.push('Extra Custom'+(sel.customOpt.note?' ('+sel.customOpt.note+')':''));
+    return'  ['+b.cod+'] '+b.name+' x'+sel.qty+'  →  '+(r?fmtE(r.pAlt*sel.qty):'—')+(opts.length?' | Optional: '+opts.join(', '):'');
+  }).filter(Boolean).join('\n')||'  (nessun modulo)';
+
+  // ── Variazioni automatiche + manuali (uguale sezione 4) ──
+  const autoVar=[];
+  const def4=q.lineaTipoId!=null?COMM_DEF[q.lineaTipoId]:null;
+  if(def4){
+    const fields=[['su_om','Start-Up ore mec.',def4.U?.su_om||300],['su_oe','Start-Up ore ele.',def4.U?.su_oe||300],['sm_om','Smontaggio ore mec.',def4.U?.sm_om||300],['sm_oe','Smontaggio ore ele.',def4.U?.sm_oe||300]];
+    fields.forEach(([f,lbl,std])=>{if(q.comm[f]!=null&&q.comm[f]!==std)autoVar.push({tipo:'FAT',mod:'Attività in fabbrica',campo:lbl,orig:std,nuovo:q.comm[f],delta:q.comm[f]-std,isE:false});});
+  }
+  if(q.comm.y_mp!=null||q.comm.y_om!=null||q.comm.y_oe!=null)autoVar.push({tipo:'Y',mod:'Ore Generali',campo:'Override manuale',orig:'auto',nuovo:'custom',isE:false});
+  if(q.comm.tia_mp!=null)autoVar.push({tipo:'TIA',mod:'Trasporti e Imballaggi',campo:'Override manuale',orig:'auto 2%',nuovo:fmtE(q.comm.tia_mp),isE:false});
+  if(q.comm.co_mp!=null)autoVar.push({tipo:'CO',mod:'Consumabili',campo:'Override manuale',orig:'auto 2.2%',nuovo:fmtE(q.comm.co_mp),isE:false});
+  _sM.filter(s=>s.customOpt&&s.customOpt.on).forEach(sel=>{const b=MB[sel.midx];if(!b)return;autoVar.push({tipo:'Extra Custom',mod:b.name,campo:sel.customOpt.note||'—',orig:0,nuovo:sel.customOpt.mp||0,isE:true});});
+  if(q.lineaTechId!=null&&q.lineaTechId>0&&_sM.some(s=>getMarkup(MB[s.midx]?.cod,q.lineaTechId)>0))autoVar.push({tipo:'Markup tecnologia',mod:q.lineaTechId===1?'Rockwell':'Altro',campo:'su moduli Q_HIGH',isInfo:true});
+  const allVar=[...autoVar,...(q.variazioni||[]).map(v=>({tipo:v.tipo||'Manuale',mod:v.mod||'—',campo:v.motivazione||'—',orig:v.orig,nuovo:v.nuovo,delta:v.delta,isE:true}))];
+  const varLines=allVar.length
+    ? allVar.map((v,i)=>{
+        if(v.isInfo)return'  '+(i+1)+'. [INFO] '+v.tipo+': '+v.mod+' — '+v.campo;
+        return'  '+(i+1)+'. ['+v.tipo+'] '+v.mod+(v.campo?' — '+v.campo:'')+': '+(v.isE?fmtE(v.orig)+' → '+fmtE(v.nuovo):v.orig+' → '+v.nuovo)+(v.isE&&v.delta!=null?' (Δ '+(v.delta>0?'+':'')+fmtE(v.delta)+')':'');
+      }).join('\n')
+    : '  Nessuna variazione rilevata.';
+
+  // ── Parametri ──
+  const tl=tL(q.lineaTipoId)||'—';
+  const th=techL(q.lineaTechId)||'—';
+  const paramLines=[
+    `  Tipologia linea:   ${tl}`,
+    `  Tecnologia:        ${th}`,
+    `  Nazione cliente:   ${q.clientNazione||'—'}`,
+    `  Rate H:            ${fmtE(q.rateH)}/h`,
+    `  Margine:           ${q.margine}%`,
+    `  Provvigioni:       ${q.provv}%`,
+    `  Leva:              ${q.altro}%`,
+    `  Valuta offerta:    ${cur.code}`,
+  ].join('\n');
+
+  // ── JSON completo (per importazione) ──
+  const jsonData=JSON.stringify({quotes:[q],extraTAR:{}},null,2);
+
+  try{
+    await emailjs.send(EJS_SERVICE_ID,EJS_TEMPLATE_ID,{
+      to_email:       approver.email,
+      approver_name:  approver.name,
+      propNum:        q.propNum||'—',
+      clientName:     q.clientName||'—',
+      clientRef:      q.clientRef||'—',
+      clientNazione:  q.clientNazione||'—',
+      totale:         totEUR,
+      totale_valuta:  totCur||totEUR,
+      otp_code:       code,
+      otp_expiry:     expStr,
+      eco_lines:      ecoLines,
+      moduli_lines:   moduLines,
+      variazioni_lines: varLines,
+      param_lines:    paramLines,
+      json_data:      jsonData,
+    });
+    toast(`Email inviata a ${approver.email}`,'ok');
+    S.otpModal={role};paint();
+  }catch(err){
+    console.error(err);
+    toast('Errore invio email EmailJS.','err',6000);
+  }
+}
+function verificaOTP(){const q=Q();if(!q||!S.otpModal)return;const input=document.getElementById('otp-input')?.value||'';const {role}=S.otpModal;if(!otpVerify(q.id,role,input)){toast('Codice non valido o scaduto.','err');return;}const ts=new Date().toISOString();const log={ts,approver:APPROVERS[role].name,email:APPROVERS[role].email};if(role==='cfok')upQF({cfok:true,cfokTs:ts,cfokLog:log});else upQF({admk:true,admkTs:ts,admkLog:log});S.otpModal=null;toast(`Approvazione ${APPROVERS[role].name} registrata ✓`,'ok');paint();}
+function revocaApprovazione(role){showConfirm('Revocare l\u2019approvazione '+APPROVERS[role].name+'?',function(){if(role==='cfok')upQF({cfok:false,cfokTs:null,cfokLog:null});else upQF({admk:false,admkTs:null,admkLog:null});});}
+function closeOtpModal(){S.otpModal=null;paint();}
+function renderOtpModal(){if(!S.otpModal)return'';const {role}=S.otpModal;const approver=APPROVERS[role];return`<div class="modal-overlay" onclick="if(event.target===this)closeOtpModal()"><div class="modal-box"><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><div style="width:44px;height:44px;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);background:#F08A05;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-shield-lock" style="font-size:20px;color:#fff"></i></div><div><div style="font-size:16px;font-weight:600;color:#3D3D3C">Codice approvazione</div><div style="font-size:12px;color:#666462;margin-top:2px">${approver.name} — ${approver.email}</div></div></div><div style="background:#F9F9F8;border:1px solid #E8E6E0;border-radius:4px;padding:14px;margin-bottom:18px;font-size:13px;color:#3D3D3C;line-height:1.65">Codice OTP a 6 cifre inviato a <strong>${approver.email}</strong>.<br>Valido <strong>48 ore</strong>.</div><div style="margin-bottom:16px"><div class="lbl" style="margin-bottom:8px">Codice OTP</div><input id="otp-input" type="text" inputmode="numeric" maxlength="6" placeholder="000000" style="color:#3D3D3C !important;background:#fff !important;-webkit-text-fill-color:#3D3D3C !important;width:100%;font-size:32px;font-weight:700;text-align:center;letter-spacing:0.35em;padding:13px;border:2px solid #F08A05;border-radius:6px;font-family:'Barlow',sans-serif;" onkeydown="if(event.key==='Enter')verificaOTP()"></div><div style="display:flex;gap:10px"><button onclick="verificaOTP()" class="btn-o" style="flex:1;padding:11px;font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ti ti-check" style="font-size:15px"></i> Conferma</button><button onclick="closeOtpModal()" style="padding:11px 16px;font-size:12px;font-weight:600">Annulla</button></div><div style="margin-top:14px;text-align:center;font-size:12px;color:#666462">Non hai ricevuto? <button onclick="richiestaOTP('${role}')" style="border:none;background:none;color:#F08A05;font-weight:600;cursor:pointer;font-size:12px;padding:0">Invia di nuovo</button></div></div></div>`;}
+const LOGO=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 52" style="height:38px;width:auto;display:block"><polygon points="18,3 34,3 42,16 34,30 18,30 10,16" fill="#F08A05"/><text x="26" y="21" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="700" font-size="12" fill="#fff" letter-spacing="0.5">UCT</text><text x="50" y="13" font-family="Barlow,Arial,sans-serif" font-weight="600" font-size="9" fill="#3D3D3C">United</text><text x="50" y="22" font-family="Barlow,Arial,sans-serif" font-weight="600" font-size="9" fill="#3D3D3C">Converting</text><text x="50" y="31" font-family="Barlow,Arial,sans-serif" font-weight="600" font-size="9" fill="#3D3D3C">Tissue</text></svg>`;
+const LOGO_W=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 52" style="height:30px;width:auto;display:block"><polygon points="18,3 34,3 42,16 34,30 18,30 10,16" fill="#F08A05"/><text x="26" y="21" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="700" font-size="12" fill="#fff" letter-spacing="0.5">UCT</text><text x="50" y="13" font-family="Barlow,Arial,sans-serif" font-weight="600" font-size="9" fill="#fff">United</text><text x="50" y="22" font-family="Barlow,Arial,sans-serif" font-weight="600" font-size="9" fill="#fff">Converting</text><text x="50" y="31" font-family="Barlow,Arial,sans-serif" font-weight="600" font-size="9" fill="#fff">Tissue</text></svg>`;
+
+function renderJsonModal(){
+  if(!S.showJsonModal)return'';
+  var h='';
+
+  if(S.autoLinkMsg){h+='<div style="background:#1a5212;color:#fff;padding:10px 16px;border-radius:4px;margin-bottom:12px;display:flex;align-items:center;gap:10px;font-size:13px"><i class="ti ti-link" style="font-size:16px;flex-shrink:0"></i><span>'+S.autoLinkMsg+'</span></div>';}  h+='<div class="modal-overlay" onclick="if(event.target===this)set({showJsonModal:false})">';
+  h+='<div class="modal-box" style="max-width:560px">';
+  h+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">';
+  h+='<div style="width:44px;height:44px;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);background:#3D3D3C;display:flex;align-items:center;justify-content:center;flex-shrink:0">';
+  h+='<i class="ti ti-file-plus" style="font-size:20px;color:#fff"></i></div>';
+  h+='<div><div style="font-size:16px;font-weight:600;color:#3D3D3C">Crea file JSON</div>';
+  h+='<div style="font-size:12px;color:#666462;margin-top:2px">Incolla il testo ricevuto via email e scarica il file</div></div></div>';
+  h+='<div style="background:#F9F9F8;border:1px solid #E8E6E0;border-radius:4px;padding:11px 13px;margin-bottom:12px;font-size:12px;color:#3D3D3C;line-height:1.6">';
+  h+='Nell\'email trovi il blocco <strong>IMPORTAZIONE DATI</strong>.<br>';
+  h+='Copia il testo da <strong>{</strong> fino alla <strong>}</strong> finale e incollalo qui sotto.</div>';
+  h+='<div style="margin-bottom:14px">';
+  h+='<div class="lbl" style="margin-bottom:7px">Testo JSON</div>';
+  h+='<textarea id="json-paste-area" placeholder="Incolla qui il testo JSON..."';
+  h+=' style="color:#3D3D3C !important;background:#fff !important;-webkit-text-fill-color:#3D3D3C !important;';
+  h+='width:100%;font-size:11px;font-family:monospace;min-height:180px;resize:vertical;padding:10px;';
+  h+='border:1.5px solid #D5D3CE;border-radius:4px;line-height:1.4;"';
+  h+=' oninput="validateJsonPaste(this)"></textarea>';
+  h+='<div id="json-paste-status" style="font-size:11px;margin-top:5px;min-height:16px"></div></div>';
+  h+='<div style="display:flex;gap:10px">';
+  h+='<button onclick="scaricaJsonDaIncolla()" class="btn-d" style="flex:1;padding:11px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:6px">';
+  h+='<i class="ti ti-download" style="font-size:15px"></i> Scarica .json</button>';
+  h+='<button onclick="set({showJsonModal:false})" style="padding:11px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:600">Chiudi</button>';
+  h+='</div></div></div>';
+  return h;
+}
+
+function validateJsonPaste(el){
+  const status=document.getElementById('json-paste-status');
+  if(!el.value.trim()){status.innerHTML='';el.style.borderColor='#D5D3CE';return;}
+  try{
+    const d=JSON.parse(el.value.trim());
+    if(d.quotes&&Array.isArray(d.quotes)){
+      status.innerHTML='<span style="color:#1a5212;font-weight:600">' + String.fromCharCode(10003) + ' JSON valido — ' + d.quotes.length + ' offerta/e pronte per l\'importazione</span>';
+      el.style.borderColor='#3d9e28';
+    } else {
+      status.innerHTML='<span style="color:#c07200;font-weight:600">Attenzione: struttura non riconosciuta (manca "quotes")</span>';
+      el.style.borderColor='#F08A05';
+    }
+  } catch(e){
+    status.innerHTML='<span style="color:#c0200a;font-weight:600">Testo non valido — copia tutto il blocco da { fino alla } finale</span>';
+    el.style.borderColor='#E24B4A';
+  }
+}
+
+function scaricaJsonDaIncolla(){
+  const area=document.getElementById('json-paste-area');
+  if(!area||!area.value.trim()){toast('Incolla prima il testo JSON.','err');return;}
+  try{
+    const d=JSON.parse(area.value.trim());
+    if(!d.quotes)throw new Error('struttura non valida');
+    const nome=d.quotes.length>0?'uct-cpq-'+d.quotes[0].propNum+'.json':'uct-cpq-offerta.json';
+    const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=nome;a.click();
+    toast('File '+nome+' scaricato','ok');
+    set({showJsonModal:false});
+  } catch(e){
+    toast('Testo non valido — copia tutto il blocco JSON dall\'email.','err',5000);
+  }
+}
+
+function resetGgRip(act){var q=Q();if(!q)return;var rows=Object.assign({},q.comm.rows);rows[act]=Object.assign({},rows[act],{ggRip:null});upQF({comm:Object.assign({},q.comm,{rows:rows})});}
+function resetGgViag(act){var q=Q();if(!q)return;var rows=Object.assign({},q.comm.rows);rows[act]=Object.assign({},rows[act],{ggViag:null});upQF({comm:Object.assign({},q.comm,{rows:rows})});}
+function updateCvRate(field,val){const cm=Object.assign({},Q().comm);cm[field]=val===''?null:parseFloat(val)||null;upQF({comm:cm});}
+function resetCvRate(field){const cm=Object.assign({},Q().comm);cm[field]=null;upQF({comm:cm});}
+function updateCvKey(el){var cm=Object.assign({},Q().comm);cm[el.dataset.cvkey]=el.checked;upQF({comm:cm});}
+
+function showConfirm(msg, onOk){
+  S.confirmModal={msg, onOk};
+  paint();
+}
+function renderConfirmModal(){
+  if(!S.confirmModal)return'';
+  var msg=S.confirmModal.msg;
+  var h='';
+  h+='<div class="modal-overlay" onclick="if(event.target===this){S.confirmModal=null;paint();}">';
+  h+='<div class="modal-box" style="max-width:380px">';
+  h+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">';
+  h+='<div style="width:40px;height:40px;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);background:#c0200a;display:flex;align-items:center;justify-content:center;flex-shrink:0">';
+  h+='<i class="ti ti-trash" style="font-size:18px;color:#fff"></i></div>';
+  h+='<div style="font-size:15px;font-weight:600;color:#3D3D3C">Conferma eliminazione</div>';
+  h+='</div>';
+  h+='<div style="font-size:13px;color:#3D3D3C;margin-bottom:20px;line-height:1.6">'+msg+'</div>';
+  h+='<div style="display:flex;gap:10px">';
+  h+='<button onclick="var cb=S.confirmModal.onOk;S.confirmModal=null;cb();" ';
+  h+='style="flex:1;padding:10px;font-family:Barlow,sans-serif;font-size:13px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;background:#c0200a;color:#fff;border:none;border-radius:4px;cursor:pointer">Elimina</button>';
+  h+='<button onclick="S.confirmModal=null;paint();" ';
+  h+='style="padding:10px 16px;font-family:Barlow,sans-serif;font-size:12px;font-weight:600">Annulla</button>';
+  h+='</div>';
+  h+='</div></div>';
+  return h;
+}
+
+function paint(){const el=document.getElementById('app');if(!el)return;if(S.loading){el.innerHTML='<div style="padding:2rem">Caricamento...</div>';return;}let h=hdr();if(S.pg==='list'){el.innerHTML=h+listPg()+renderOtpModal()+renderJsonModal()+renderConfirmModal();return;}const q=Q();if(!q){set({pg:'list',qid:null});return;}const t=cAll(q);h+=`<div>${stH(q)}</div><div style="padding:16px 22px 110px;background:#F2F2F0">${body(q,t)}</div><div>${fH(q,t)}</div>`;el.innerHTML=h+renderOtpModal()+renderConfirmModal();if(S.otpModal)setTimeout(()=>{const inp=document.getElementById('otp-input');if(inp)inp.focus();},100);}
+function hdr(){return`<div style="background:#fff;border-bottom:2px solid #F08A05;padding:0 22px;display:flex;align-items:center;height:58px;position:sticky;top:0;z-index:100">${LOGO}<div style="width:1px;height:36px;background:#E8E6E0;margin:0 20px"></div><div><div style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:600;color:#3D3D3C;letter-spacing:0.08em;text-transform:uppercase">Configuratore Aziendale</div><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:500;color:#F08A05;letter-spacing:0.12em;text-transform:uppercase">CPQ — Configure · Price · Quote</div></div>${S.pg!=='list'?`<button onclick="set({pg:'list',qid:null})" style="margin-left:auto;font-size:12px;padding:5px 12px;display:flex;align-items:center;gap:5px;font-family:Barlow Condensed,sans-serif;letter-spacing:0.05em;text-transform:uppercase;font-weight:600"><i class="ti ti-layout-list" style="font-size:14px"></i> Tutte le offerte</button>`:''}</div>`;}
+function stH(q){const done={cliente:!!(q.clientName&&q.propNum),moduli:(q.selMods||[]).some(s=>s.qty>0),commissioning:true,variazioni:true,anteprima:true,approvazione:q.cfok&&q.admk,offerta:false};let h=`<div style="background:#fff;border-bottom:1px solid #E8E6E0;padding:0 16px;display:flex;align-items:stretch;overflow-x:auto;position:sticky;top:58px;z-index:99">`;STEPS.forEach((st,i)=>{const isA=S.step===st.id,isDone=done[st.id]&&!isA;h+=`<button onclick="set({step:'${st.id}'})" style="display:flex;align-items:center;gap:6px;padding:11px 10px;border:none;background:transparent;cursor:pointer;border-bottom:${isA?'3px solid #F08A05':'3px solid transparent'};border-radius:0;font-family:'Barlow',sans-serif;white-space:nowrap;flex-shrink:0;color:${isA?'#F08A05':'#3D3D3C'}"><span style="width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;${isDone?'background:#F08A05;color:#fff':isA?'background:#3D3D3C;color:#fff':'background:#E8E6E0;color:#3D3D3C'}">${isDone?'<i class="ti ti-check" style="font-size:9px"></i>':(i+1)}</span><span style="font-size:11px;font-weight:${isA?600:500}">${st.lbl}</span></button>${i<STEPS.length-1?`<span style="color:#D5D3CE;font-size:11px;display:flex;align-items:center;flex-shrink:0"><i class="ti ti-chevron-right"></i></span>`:''}`});return h+`</div>`;}
+function fH(q,t){const mod=cMO(q);const cur=getCurr(q);const st=SM[q.status]||SM.bozza;const ci=STEPS.findIndex(s=>s.id===S.step);const prev=ci>0?STEPS[ci-1].id:null,next=ci<STEPS.length-1?STEPS[ci+1].id:null;const serv=cS(q);let lSx,vSx,lDx,vDx;if(S.step==='moduli'){const m_f=q.margine/100,p_f=q.provv/100,a_f=q.altro/100;const pL_f=m_f<1?Math.round((mod.costoBase+serv.suC+serv.smC)/(1-m_f)):(mod.costoBase+serv.suC+serv.smC);const garC_f=Math.round((pL_f+serv.commTot+serv.tivC+serv.costiViviTot)*0.021);const garM_f=m_f<1?Math.round(garC_f/(1-m_f)):garC_f;const sub_f=pL_f+mod.met+garM_f;const subP_f=p_f<1?Math.round(sub_f/(1-p_f)):sub_f;const totFin_f=a_f<1?Math.round(subP_f/(1-a_f)):subP_f;const cvTotF=serv.commTot+serv.tivC+serv.costiViviTot;const cvTotProvF=p_f<1?Math.round(cvTotF/(1-p_f)):cvTotF;const cvTotLevaF=a_f<1?Math.round(cvTotProvF/(1-a_f)):cvTotProvF;const totCommF=totFin_f+cvTotLevaF;const margMPcalc=totCommF>0?Math.round((1-(mod.costoMPtot/totCommF))*1000)/10:0;lSx='Margine a MP';vSx=margMPcalc+'%';lDx='Offerta moduli '+cur.code;vDx=fmtC(totFin_f,q);}else if(S.step==='commissioning'){const m_f=q.margine/100,p_f=q.provv/100,a_f=q.altro/100;const pL_f=m_f<1?Math.round((mod.costoBase+serv.suC+serv.smC)/(1-m_f)):(mod.costoBase+serv.suC+serv.smC);const garC_f=Math.round((pL_f+serv.commTot+serv.tivC+serv.costiViviTot)*0.021);const garM_f=m_f<1?Math.round(garC_f/(1-m_f)):garC_f;const sub_f=pL_f+mod.met+garM_f;const subP_f=p_f<1?Math.round(sub_f/(1-p_f)):sub_f;const totFin_f=a_f<1?Math.round(subP_f/(1-a_f)):subP_f;const cvTot_f=serv.commTot+serv.tivC+serv.costiViviTot;const cvTotProv_f=p_f<1?Math.round(cvTot_f/(1-p_f)):cvTot_f;const cvTotLeva_f=a_f<1?Math.round(cvTotProv_f/(1-a_f)):cvTotProv_f;const totComm=totFin_f+cvTotLeva_f;lSx='Offerta Moduli '+cur.code;vSx=fmtC(totFin_f,q);lDx='Mod.+Comm.+TIV+CV '+cur.code;vDx=fmtC(totComm,q);}else if(S.step==='anteprima'||S.step==='variazioni'||S.step==='offerta'){const m_f=q.margine/100,p_f=q.provv/100,a_f=q.altro/100;const pL_f=m_f<1?Math.round((mod.costoBase+serv.suC+serv.smC)/(1-m_f)):(mod.costoBase+serv.suC+serv.smC);const garC_f=Math.round((pL_f+serv.commTot+serv.tivC+serv.costiViviTot)*0.021);const garM_f=m_f<1?Math.round(garC_f/(1-m_f)):garC_f;const sub_f=pL_f+mod.met+garM_f;const subP_f=p_f<1?Math.round(sub_f/(1-p_f)):sub_f;const totFin_f=a_f<1?Math.round(subP_f/(1-a_f)):subP_f;const cvTot_f=serv.commTot+serv.tivC+serv.costiViviTot;const cvTotProv_f=p_f<1?Math.round(cvTot_f/(1-p_f)):cvTot_f;const cvTotLeva_f=a_f<1?Math.round(cvTotProv_f/(1-a_f)):cvTotProv_f;const totComm_v=totFin_f+cvTotLeva_f;lSx='Offerta Moduli '+cur.code;vSx=fmtC(totFin_f,q);lDx='Mod.+Comm.+TIV+CV '+cur.code;vDx=fmtC(totComm_v,q);}else{lSx='Moduli';vSx=fmtC(mod.totAlt,q);lDx='Offerta totale '+cur.code;vDx=fmtC(t.totAlt,q);}return`<div style="background:#fff;border-top:2px solid #E8E6E0;padding:10px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;bottom:0;z-index:99"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;padding:3px 10px;border-radius:2px;font-weight:700;letter-spacing:0.06em;font-family:Barlow Condensed,sans-serif;text-transform:uppercase;background:${st.bg};color:${st.c};border-left:3px solid ${st.b}">${st.l}</span><span style="font-size:14px;font-weight:600;font-family:Barlow Condensed,sans-serif;color:#3D3D3C">${q.propNum||'—'}</span>${q.clientName?`<span style="font-size:12px;color:#3D3D3C">— ${q.clientName}${q.clientNazione?' ('+q.clientNazione+')':''}</span>`:''}</div><div style="margin-left:auto;display:flex;align-items:center;gap:18px">${S.step!=='cliente'?`<div style="text-align:right"><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;color:#3D3D3C;letter-spacing:0.08em;text-transform:uppercase">${lSx}</div><div style="font-size:13px;font-weight:700;color:#3D3D3C">${vSx}</div></div><div style="width:1px;height:28px;background:#E8E6E0"></div><div style="text-align:right"><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;color:#F08A05;letter-spacing:0.08em;text-transform:uppercase">${lDx}</div><div style="font-size:16px;font-weight:700;color:#F08A05">${vDx}</div></div>`:''}<div style="display:flex;gap:6px">${prev?`<button onclick="set({step:'${prev}'})" style="padding:8px 14px;font-size:12px;display:flex;align-items:center;gap:4px;font-family:Barlow Condensed,sans-serif;font-weight:600;text-transform:uppercase"><i class="ti ti-chevron-left" style="font-size:13px"></i> Indietro</button>`:''} ${next?`<button onclick="set({step:'${next}'})" class="btn-o" style="padding:8px 16px;font-size:12px;font-family:Barlow Condensed,sans-serif;text-transform:uppercase;display:flex;align-items:center;gap:5px">Avanti <i class="ti ti-chevron-right" style="font-size:13px"></i></button>`:`<button onclick="set({step:'offerta'})" class="btn-d" style="padding:8px 16px;font-size:12px;font-family:Barlow Condensed,sans-serif;text-transform:uppercase;display:flex;align-items:center;gap:5px"><i class="ti ti-file-text" style="font-size:13px"></i> Genera offerta</button>`}</div></div></div>`;}
+function body(q,t){if(S.step==='cliente')return pgC(q);if(S.step==='moduli')return pgM(q,t);if(S.step==='commissioning')return pgK(q,t);if(S.step==='variazioni')return pgV(q,t);if(S.step==='anteprima')return pgA(q,t);if(S.step==='approvazione')return pgApp(q,t);if(S.step==='offerta')return pgO(q,t);return'';}
+function pBands(q,tot,allL,pMin,pProv,pAlt,tOM,tOE){const cur=getCurr(q);const cr=cur.code==='EUR'?1:cur.rate;return`<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:5px"><div class="pb"><div class="pl">MP moduli</div><div class="pv">${fmtE(tot)}</div></div><div class="pb"><div class="pl">Ore mod.</div><div class="pv">${fmtE(allL)}</div></div><div class="pb"><div class="pl">Min. ${q.margine}%</div><div class="pv">${fmtE(pMin)}</div></div><div class="pb"><div class="pl">+Provv.</div><div class="pv">${fmtE(pProv)}</div></div><div class="pb hi"><div class="pl">Offerta ${cur.code}</div><div class="pv">${cur.code==='EUR'?fmtE(pAlt):cur.sym+' '+Math.round(pAlt*cr).toLocaleString('it-IT')}</div></div><div class="pb" style="min-width:90px"><div class="pl">Ore</div><div class="pv" style="font-size:12px">${tOM+tOE}h</div><div class="ps">${tOM}M·${tOE}E</div></div></div>`;}
+function tGen(q){const t=cAll(q),cur=getCurr(q),mod=cMO(q);const cr=cur.code==='EUR'?1:cur.rate;const _m=q.margine/100,_p=q.provv/100,_a=q.altro/100;const _serv=cS(q);const _pL=_m<1?Math.round((mod.costoBase+_serv.suC+_serv.smC)/(1-_m)):(mod.costoBase+_serv.suC+_serv.smC);const _garC=Math.round((_pL+_serv.commTot+_serv.tivC+_serv.costiViviTot)*0.021);const _garM=_m<1?Math.round(_garC/(1-_m)):_garC;const _sub=_pL+mod.met+_garM;const _subP=_p<1?Math.round(_sub/(1-_p)):_sub;const _totModuli=_a<1?Math.round(_subP/(1-_a)):_subP;const _cvT=_serv.commTot+_serv.tivC+_serv.costiViviTot;const _cvP=_p<1?Math.round(_cvT/(1-_p)):_cvT;const _totInstall=_a<1?Math.round(_cvP/(1-_a)):_cvP;const _totOfferta=_totModuli+_totInstall;const pills=[{l:'Totale Moduli',v:fmtE(_totModuli),s:'offerta moduli con leva',h:false},{l:'Totale Installazione',v:fmtE(_totInstall),s:'comm.+TIV+CV con leva',h:false},{l:'Totale Offerta',v:fmtE(_totOfferta),s:'EUR',h:true},...(cur.code!=='EUR'?[{l:'Tot. '+cur.code,v:cur.sym+' '+Math.round(_totOfferta*cr).toLocaleString('it-IT'),s:'cambio '+cur.rate,h:false}]:[]),];return`<div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #3D3D3C;border-radius:4px;padding:13px 16px;margin-bottom:12px"><div class="lbl" style="margin-bottom:10px">Totale generale</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px">${pills.map(({l,v,s,h})=>`<div class="pb${h?' hi':''}"><div class="pl">${l}</div><div class="pv">${v}</div><div class="ps">${s}</div></div>`).join('')}</div></div>`;}
+
+function pgC(q){
+  const paesiStd=Object.keys(TAR).sort();const nazioneSel=q.clientNazione||'';const hasTar=nazioneSel&&!!TAR[nazioneSel];const isCustom=nazioneSel&&!paesiStd.includes(nazioneSel);
+  const rateForm=S.showRateForm?`<div style="margin-top:12px;background:#FDF3E3;border:1.5px solid #F08A05;border-radius:6px;padding:16px"><div style="display:flex;gap:10px;margin-bottom:14px"><div style="width:32px;height:32px;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);background:#F08A05;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-alert-triangle" style="font-size:15px;color:#fff"></i></div><div><div style="font-size:13px;font-weight:700;color:#7A4800;margin-bottom:3px">Nazione senza tariffe — ${S.rateFormNazione}</div><div style="font-size:12px;color:#7A4800;line-height:1.5">Inserisci le tariffe per il commissioning.</div></div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px"><div><div class="lbl" style="margin-bottom:5px;font-size:9px">✈ Volo A/R (€/pax)</div><input id="rf-volo" type="text" inputmode="numeric" placeholder="Es. 1500" style="${WS}width:100%;font-size:14px;font-weight:600;padding:8px 10px;border:1px solid #F08A05;border-radius:4px;"></div><div><div class="lbl" style="margin-bottom:5px;font-size:9px">🚗 Auto (€/gg)</div><input id="rf-auto" type="text" inputmode="numeric" placeholder="Es. 130" style="${WS}width:100%;font-size:14px;font-weight:600;padding:8px 10px;border:1px solid #F08A05;border-radius:4px;"></div><div><div class="lbl" style="margin-bottom:5px;font-size:9px">🏨 Hotel (€/notte)</div><input id="rf-hotel" type="text" inputmode="numeric" placeholder="Es. 120" style="${WS}width:100%;font-size:14px;font-weight:600;padding:8px 10px;border:1px solid #F08A05;border-radius:4px;"></div></div><div style="display:flex;gap:8px"><button onclick="salvaTariffe()" class="btn-o" style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:7px 18px;display:flex;align-items:center;gap:5px"><i class="ti ti-device-floppy" style="font-size:13px"></i> Salva tariffe</button><button onclick="set({showRateForm:false})" style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:600;padding:7px 14px">Salta</button></div></div>`:(!S.showRateForm&&nazioneSel&&!hasTar)?`<div style="margin-top:8px;background:#FDF3E3;border-left:3px solid #F08A05;border-radius:3px;padding:10px 14px;display:flex;gap:10px;align-items:center"><i class="ti ti-alert-triangle" style="color:#F08A05;font-size:15px;flex-shrink:0"></i><div style="flex:1;font-size:12px;color:#7A4800;font-weight:500">Nessuna tariffa per <strong>${nazioneSel}</strong>.</div><button onclick="set({showRateForm:true,rateFormNazione:'${nazioneSel}'})" style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:5px 12px;background:#F08A05;color:#fff;border:none;border-radius:3px;cursor:pointer;flex-shrink:0">Inserisci tariffe</button></div>`:'';
+  const nazBadge=nazioneSel&&hasTar?`<div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:11px;color:#1a5212;font-weight:500"><i class="ti ti-check" style="font-size:11px;color:#3d9e28"></i>Tariffe: Volo €${TAR[nazioneSel].volo} · Auto €${TAR[nazioneSel].auto}/gg · Hotel €${TAR[nazioneSel].hotel}/notte</div>`:'';
+  return`<div style="max-width:580px;margin:0 auto"><div style="margin-bottom:16px"><h2 style="font-family:'Barlow',sans-serif;font-size:22px;font-weight:300;color:#3D3D3C;margin-bottom:6px">Dati cliente e proposta</h2><div style="height:2px;width:60px;background:#F08A05;margin-bottom:8px"></div></div>
+  <div style="background:#fff;border:1px solid #E8E6E0;border-radius:4px;padding:16px;display:flex;flex-direction:column;gap:14px;margin-bottom:12px">
+    <div><div class="lbl" style="margin-bottom:5px">Numero proposta</div><input type="text" value="${q.propNum}" onchange="upQ({propNum:this.value})" placeholder="UCT26.P.3000.0" style="${WS}width:100%;font-size:14px;padding:9px 12px;font-weight:600;border:1px solid #D5D3CE;border-radius:4px;"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><div class="lbl" style="margin-bottom:5px">Ragione sociale</div><input type="text" value="${q.clientName}" onchange="upQ({clientName:this.value})" placeholder="Nome azienda" style="${WS}width:100%;font-size:14px;padding:9px 12px;border:1px solid #D5D3CE;border-radius:4px;"></div>
+      <div><div class="lbl" style="margin-bottom:5px">Riferimento / RFQ</div><input type="text" value="${q.clientRef}" onchange="upQ({clientRef:this.value})" placeholder="Codice commessa" style="${WS}width:100%;font-size:14px;padding:9px 12px;border:1px solid #D5D3CE;border-radius:4px;"></div>
+    </div>
+  </div>
+  <div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;padding:14px 16px;margin-bottom:12px">
+    <div class="lbl" style="margin-bottom:10px">Nazione del cliente</div>
+    <select onchange="selNazione(this.value)" style="${WS}width:100%;font-size:13px;padding:9px 12px;border:1px solid #D5D3CE;border-radius:4px;">
+      <option value="">— Seleziona nazione —</option>
+      ${paesiStd.map(p=>`<option value="${p}" ${nazioneSel===p?'selected':''}>${p}</option>`).join('')}
+      <option value="__custom__" ${isCustom?'selected':''}>✏ Altra nazione</option>
+    </select>
+    ${isCustom||(!paesiStd.includes(nazioneSel)&&nazioneSel)?`<div style="margin-top:10px"><div class="lbl2" style="margin-bottom:5px;font-size:9px">Nome nazione (inglese)</div><input type="text" value="${isCustom?nazioneSel:''}" onchange="selNazione(this.value)" placeholder="Es. Brazil..." style="${WS}width:100%;font-size:14px;padding:9px 12px;font-weight:600;border:1px solid #F08A05;border-radius:4px;"></div>`:''}
+    ${nazBadge}${rateForm}
+  </div>
+  <div style="background:#fff;border:1px solid #E8E6E0;border-radius:4px;padding:14px 16px;margin-bottom:12px">
+    <div><div class="lbl" style="margin-bottom:5px">Note interne</div><textarea onchange="upQ({notes:this.value})" placeholder="Contesto trattativa..." style="${WS}width:100%;font-size:13px;min-height:55px;resize:vertical;padding:9px 12px;border:1px solid #D5D3CE;border-radius:4px;">${q.notes}</textarea></div>
+  </div>
+  <div style="background:#fff;border:1px solid #E8E6E0;border-radius:4px;padding:14px;margin-bottom:12px">
+    <div class="lbl" style="margin-bottom:8px">Stato offerta</div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap">${['bozza','revisione','approvazione','approvato','emesso'].map(s=>{const sc=SM[s];const isA=q.status===s;return`<button onclick="upQF({status:'${s}'})" style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:5px 12px;border-radius:2px;border:${isA?'2px solid '+sc.b:'1px solid #D5D3CE'};background:${isA?sc.bg:'#fff'};color:${isA?sc.c:'#3D3D3C'}">${sc.l}</button>`;}).join('')}</div>
+  </div>
+  <div style="padding:10px 14px;${!q.clientName||!q.propNum?'background:#FDF3E3;border-left:3px solid #F08A05':'background:#E8F5E3;border-left:3px solid #3d9e28'};font-size:13px;color:${!q.clientName||!q.propNum?'#7A4800':'#1a5212'};display:flex;gap:8px;align-items:center;font-weight:500">
+    <i class="ti ${!q.clientName||!q.propNum?'ti-info-circle':'ti-check'}"></i>
+    ${!q.clientName||!q.propNum?'Inserisci ragione sociale e numero proposta per continuare.':'Dati completi — procedi con la configurazione.'}
+  </div></div>`;
+}
+
+function pgM(q,t){
+  const pT=TIPI.map(tp=>`<button style="${tp.id===q.lineaTipoId?PON:POFF}" onclick="setTipo(${tp.id})">${tp.label}</button>`).join('');
+  const pTe=TECHS.map(tc=>`<button style="${tc.id===q.lineaTechId?PON:POFF}" onclick="setTech(${tc.id})">${tc.label}</button>`).join('');
+  const tipoLabel=tL(q.lineaTipoId);
+  let h=`<div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;margin-bottom:12px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;gap:8px"><i class="ti ti-settings" style="color:#F08A05;font-size:15px"></i><span class="lbl">Tipologia linea e tecnologia</span></div><div style="padding:14px 16px"><div class="lbl" style="margin-bottom:8px">Tipologia</div><div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px">${pT}</div><div class="lbl" style="margin-bottom:8px">Tecnologia</div><div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${pTe}</div>${q.lineaTechId!=null&&q.lineaTechId>0?`<div style="padding:8px 12px;background:${q.lineaTechId===1?'#F0EDF8':'#E8EFF7'};border-left:3px solid ${q.lineaTechId===1?'#6c5cbf':'#2a7ac4'};border-radius:3px;font-size:12px;color:${q.lineaTechId===1?'#3a2a7c':'#1a4f82'};font-weight:500">Markup: Q1/Q2/Q3 +${q.lineaTechId===1?'20':'5'}%, altri +${q.lineaTechId===1?'4':'1'}%</div>`:''}</div></div>`;
+  if(q.lineaTipoId!==null&&q.lineaTipoId!==4&&S.suggFiltro===null&&S.suggTipoId===q.lineaTipoId){h+=`<div style="background:#fff;border:1.5px solid #F08A05;border-radius:6px;padding:18px 20px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start"><div style="width:36px;height:36px;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);background:#F08A05;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-bulb" style="font-size:18px;color:#fff"></i></div><div style="flex:1"><div style="font-size:15px;font-weight:600;color:#3D3D3C;margin-bottom:5px">Suggerimento moduli — ${tipoLabel}</div><div style="font-size:13px;color:#3D3D3C;margin-bottom:14px">Mostrare solo i moduli tipici per una linea <strong>${tipoLabel}</strong>?</div><div style="display:flex;gap:10px"><button onclick="rispondiFiltro(true)" class="btn-o" style="font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:8px 22px"><i class="ti ti-check" style="font-size:14px"></i> Sì, moduli suggeriti</button><button onclick="rispondiFiltro(false)" style="font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:8px 18px"><i class="ti ti-list" style="font-size:14px"></i> Catalogo completo</button></div></div></div>`;}
+  const mkP=(lbl,val,fn,suf)=>`<div style="background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:8px 10px"><div class="lbl" style="margin-bottom:4px">${lbl}</div><div style="display:flex;align-items:center;gap:4px">${iT(val,`upQF({${fn}:parseFloat(this.value.replace(',','.'))||0})`,`border:none;width:100%;font-size:15px;font-weight:700;padding:0;`,60)}<span style="font-size:12px;color:#3D3D3C;font-weight:500">${suf}</span></div></div>`;
+  h+=`<div style="background:#fff;border:1px solid #E8E6E0;border-radius:4px;margin-bottom:12px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;gap:8px"><i class="ti ti-adjustments" style="color:#F08A05;font-size:15px"></i><span class="lbl">Parametri di calcolo</span></div><div style="padding:12px 16px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px">${mkP('Rate H',q.rateH,'rateH','€/h')}${mkP('Margine',q.margine,'margine','%')}${mkP('Provvigioni',q.provv,'provv','%')}${mkP('Leva',q.altro,'altro','%')}</div><div style="border-top:1px solid #F2F2F0;padding-top:10px"><div class="lbl" style="margin-bottom:8px">Valuta e cambi</div><div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:8px;align-items:center"><div></div>${['EUR','USD','GBP'].map(code=>{const isA=q.currency===code;return`<div><button onclick="upQF({currency:'${code}'})" style="font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:5px 10px;border-radius:3px;width:100%;border:${isA?'2px solid #F08A05':'1px solid #D5D3CE'};background:${isA?'#FDF3E3':'#fff'};color:${isA?'#c07200':'#3D3D3C'};cursor:pointer">${CD[code].sym} ${code}${isA?' ✓':''}</button></div>`;}).join('')}<div class="lbl2" style="font-size:10px;white-space:nowrap">1 EUR =</div><div style="text-align:center;font-size:13px;font-weight:600;padding:5px 0">1,00</div>${['USD','GBP'].map(code=>{const val=(q.rates||{})[code]||CD[code].rate;return`<div>${iTDec(val,`upRate('${code}',this.value)`,80)}</div>`;}).join('')}</div></div></div></div>`;
+  const nS=(q.selMods||[]).filter(s=>s.qty>0).length;
+  const filtroAttivo=S.suggFiltro===true&&q.lineaTipoId!==null&&q.lineaTipoId!==4;
+  h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><div style="flex:1;min-width:200px;position:relative"><i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:#3D3D3C;opacity:0.5"></i><input type="text" value="${S.srch}" onchange="set({srch:this.value})" placeholder="Cerca modulo..." style="${WS}width:100%;padding-left:32px;padding-top:9px;padding-bottom:9px;font-size:13px;border:1px solid #D5D3CE;border-radius:4px;"></div>${filtroAttivo?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:#FDF9F4;border:1px solid #F08A05;border-radius:4px;font-size:11px;font-family:Barlow Condensed,sans-serif;font-weight:700;text-transform:uppercase;color:#c07200"><i class="ti ti-filter" style="font-size:12px"></i>Suggeriti — ${tipoLabel}<button onclick="rispondiFiltro(false)" style="margin-left:6px;padding:0 4px;font-size:11px;border:none;background:transparent;color:#c07200;cursor:pointer;font-weight:700">✕</button></div>`:''}${nS>0?`<span style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;background:#FDF3E3;color:#7A4800;border:1px solid #F08A05;padding:4px 12px;border-radius:2px">${nS} sel.</span>`:''}</div>`;
+  const mod=cMO(q);
+  if(nS>0)h+=`<div style="background:#fff;border:1.5px solid #F08A05;border-radius:4px;padding:9px 13px;margin-bottom:11px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px"><span class="lbl-o" style="font-size:10px">Riepilogo — ${nS} moduli</span><span class="lbl2" style="font-size:10px">${mod.totOM+mod.totOE}h</span></div>${pBands(q,mod.allMPraw,mod.allL,(q.margine/100<1?Math.round((mod.allMPraw+mod.allL)/(1-q.margine/100)):(mod.allMPraw+mod.allL)),(()=>{const pM=(q.margine/100<1?Math.round((mod.allMPraw+mod.allL)/(1-q.margine/100)):(mod.allMPraw+mod.allL));return q.provv/100<1?Math.round(pM/(1-q.provv/100)):pM;})(),(()=>{const pM=(q.margine/100<1?Math.round((mod.allMPraw+mod.allL)/(1-q.margine/100)):(mod.allMPraw+mod.allL));const pP=q.provv/100<1?Math.round(pM/(1-q.provv/100)):pM;return q.altro/100<1?Math.round(pP/(1-q.altro/100)):pP;})(),mod.totOM,mod.totOE)}</div>`;
+  const srch=S.srch.toLowerCase();const gM={};const gO=[];
+  MB.forEach((m,midx)=>{if(filtroAttivo&&!isSuggested(midx,q.lineaTipoId))return;if(srch&&!m.name.toLowerCase().includes(srch)&&!m.cod.toLowerCase().includes(srch)&&!m.cat.toLowerCase().includes(srch))return;if(!gM[m.cod]){gM[m.cod]={cat:m.cat,cod:m.cod,items:[]};gO.push(m.cod);}gM[m.cod].items.push({m,midx});});
+  if(!gO.length)h+=`<div style="text-align:center;padding:3rem 0;color:#3D3D3C;opacity:0.5">Nessun risultato.</div>`;
+  else gO.forEach(cod=>{
+    const g=gM[cod];const isOpen=S.grp[cod];let gMin=0,gSel=false;
+    g.items.forEach(({midx})=>{(q.selMods||[]).filter(s=>s.midx===midx&&s.qty>0).forEach(sel=>{gSel=true;const r=cMP(sel,q);if(r)gMin+=r.pMin*sel.qty;});});
+    const mu=getMarkup(cod,q.lineaTechId??null);const muTag=mu?`<span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:700;padding:1px 6px;border-radius:2px;background:${mu>=0.10?'#F0EDF8':'#E8EFF7'};color:${mu>=0.10?'#3a2a7c':'#1a4f82'};flex-shrink:0">+${Math.round(mu*100)}% tech</span>`:'';
+    h+=`<div style="background:#fff;border:1px solid #E8E6E0;border-left:${gSel?'4px solid #F08A05':'4px solid #E8E6E0'};border-radius:4px;margin-bottom:8px;overflow:hidden"><div onclick="tGrp('${cod}')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;background:${gSel?'#FDF9F4':'#FAFAF9'};user-select:none"><span style="font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;background:${gSel?'#F08A05':'#3D3D3C'};color:#fff;padding:3px 10px;border-radius:2px;letter-spacing:0.06em;min-width:32px;text-align:center">${cod}</span><span style="flex:1;font-size:14px;font-weight:500;color:#3D3D3C">${g.cat}</span>${muTag}${gSel?`<div style="font-size:13px;font-weight:700;color:#3D3D3C;margin-right:4px">${fmtE(gMin)}</div>`:`<span style="font-size:11px;color:#3D3D3C;margin-right:6px">${g.items.length} modelli</span>`}<i class="ti ${isOpen?'ti-chevron-up':'ti-chevron-down'}" style="font-size:14px;color:#3D3D3C;flex-shrink:0"></i></div>`;
+    if(isOpen) g.items.forEach(({m,midx})=>{
+      const isOpen2=!!S.mod[midx];const si=(q.selMods||[]).findIndex(s=>s.midx===midx);const sel=si>=0?q.selMods[si]:null,qty=sel?sel.qty:0,isSel=qty>0;const r=isSel?cMP(sel,q):null;
+      const mu2=getMarkup(m.cod,q.lineaTechId??null);const rowTag=mu2?`<span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:700;padding:1px 6px;border-radius:2px;background:${mu2>=0.10?'#F0EDF8':'#E8EFF7'};color:${mu2>=0.10?'#3a2a7c':'#1a4f82'};flex-shrink:0">+${Math.round(mu2*100)}%</span>`:'';
+      h+=`<div style="border-top:1px solid #F2F2F0"><div style="display:flex;align-items:center;gap:8px;padding:9px 14px 9px 20px;background:${isSel?'#FEFCF8':'#fff'}"><div onclick="tMod(${midx})" style="width:3px;height:24px;background:${isSel?'#F08A05':'#E8E6E0'};flex-shrink:0;cursor:pointer;border-radius:2px"></div><span onclick="tMod(${midx})" style="flex:1;font-size:13px;font-weight:${isSel?600:400};color:#3D3D3C;cursor:pointer">${m.name}</span>${rowTag}<div style="display:flex;align-items:center;gap:5px"><label class="lbl2" style="font-size:10px">Qtà</label>${iT(qty,`setQty(${midx},this.value)`,`border:1px solid ${isSel?'#F08A05':'#D5D3CE'};border-radius:4px;`,52)}</div>${r?`<div style="min-width:90px;text-align:right;font-size:13px;font-weight:700;color:#3D3D3C">${fmtE(r.pMin*qty)}</div>`:`<div style="min-width:90px;text-align:right;font-size:12px;opacity:0.4">—</div>`}<i onclick="tMod(${midx})" class="ti ${isOpen2?'ti-chevron-up':'ti-chevron-down'}" style="font-size:13px;color:#3D3D3C;cursor:pointer;opacity:0.6"></i></div>`;
+      if(isOpen2&&sel){
+        const mp=sel.mp!=null?sel.mp:m.mp,om=sel.om!=null?sel.om:m.om,oe=sel.oe!=null?sel.oe:m.oe;const isQ1=m.cod==='Q1';
+        h+=`<div style="padding:10px 14px 14px 28px;background:#F9F9F8;border-top:1px solid #F2F2F0"><div class="lbl" style="margin-bottom:7px">Valori base</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px;margin-bottom:8px"><div style="background:#fff;border:1px solid #E8E6E0;border-radius:3px;padding:7px 10px"><div class="lbl2" style="margin-bottom:4px;font-size:9px">MP Base (€)</div>${iT(mp,`upSel(${si},{mp:parseN(this.value)})`,`border:none;width:100%;font-size:14px;font-weight:700;padding:0;`,100)}</div><div style="background:#fff;border:1px solid #E8E6E0;border-radius:3px;padding:7px 10px"><div class="lbl2" style="margin-bottom:4px;font-size:9px">Ore Mec.</div>${iT(om,`upSel(${si},{om:parseN(this.value)})`,`border:none;width:100%;font-size:14px;font-weight:700;padding:0;`,100)}</div><div style="background:#fff;border:1px solid #E8E6E0;border-radius:3px;padding:7px 10px"><div class="lbl2" style="margin-bottom:4px;font-size:9px">Ore Ele.</div>${iT(oe,`upSel(${si},{oe:parseN(this.value)})`,`border:none;width:100%;font-size:14px;font-weight:700;padding:0;`,100)}</div><div style="background:#F2F2F0;border:1px solid #E8E6E0;border-radius:3px;padding:7px 10px"><div class="lbl2" style="margin-bottom:4px;font-size:9px">Costo Ore</div><div style="font-size:14px;font-weight:700;color:#3D3D3C">${fmtE((om+oe)*q.rateH)}</div></div></div>`;
+        if(r)h+=`<div style="margin-bottom:8px">${pBands(q,r.tMP*qty,(r.tOM+r.tOE)*q.rateH*qty,r.pMin*qty,r.pProv*qty,r.pAlt*qty,r.tOM*qty,r.tOE*qty)}</div>`;
+        if(m.opts.length){h+=`<div class="lbl" style="margin-bottom:6px">Optional${isQ1?' — inserisci quantità':''}</div>`;m.opts.forEach((opt,oidx)=>{const on=(sel.opts||[])[oidx];const ov=(sel.optOverrides||{})[oidx];const omp=ov?.mp!=null?ov.mp:opt.mp;const oqty=(sel.optQty||{})[oidx]||1;const bc=on?'#F08A05':'#D5D3CE';h+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F2F2F0;flex-wrap:wrap"><input type="checkbox" ${on?'checked':''} onchange="upSelOpt(${si},${oidx},this.checked)" style="width:14px;height:14px;accent-color:#F08A05;cursor:pointer;flex-shrink:0"><span style="flex:1;font-size:12px;color:#3D3D3C;font-weight:${on?600:400};min-width:120px">${opt.n}</span>${on?`<div style="flex-shrink:0;display:flex;align-items:center;gap:4px"><label class="lbl2" style="font-size:9px">Qtà</label>${iT(oqty,`upSelOptQty(${si},${oidx},this.value)`,`border:1px solid #F08A05;border-radius:4px;`,44)}</div>`:''}<div style="flex-shrink:0"><div class="lbl2" style="font-size:9px;margin-bottom:2px">MP unit. (€)</div>${iT(omp,`upSelOptVal(${si},${oidx},this.value)`,`border:1px solid ${bc};border-radius:4px;text-align:right;`,72)}</div>${on?`<div style="flex-shrink:0;font-size:11px;font-weight:700;min-width:70px;text-align:right">${fmtE(omp*oqty)}</div>`:''}</div>`;});}
+        else{h+=`<div class="lbl" style="margin-bottom:6px">Optional</div>`;}
+        const co=sel.customOpt||{};const coOn=!!co.on;const coMp=co.mp||0;const coNote=co.note||'';h+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0 4px;flex-wrap:wrap;border-top:1px dashed #D5D3CE;margin-top:2px"><input type="checkbox" ${coOn?'checked':''} onchange="upSelCustomOpt(${si},'on',this.checked)" style="width:14px;height:14px;accent-color:#2a7ac4;cursor:pointer;flex-shrink:0;margin-top:2px"><div style="flex:1;display:flex;flex-direction:column;gap:5px;min-width:0"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:12px;color:#2a7ac4;font-weight:${coOn?700:400};font-style:italic">Extra Custom</span>${coOn?`<div style="flex-shrink:0"><div class="lbl2" style="font-size:9px;margin-bottom:2px">MP (€)</div>${iT(coMp,`upSelCustomOpt(${si},'mp',this.value)`,`border:1px solid #2a7ac4;border-radius:4px;text-align:right;`,80)}</div><div style="flex-shrink:0;font-size:11px;font-weight:700;color:#2a7ac4;min-width:70px;text-align:right">${fmtE(coMp)}</div>`:''}</div>${coOn?`<input type="text" value="${coNote.replace(/"/g,'&quot;')}" onchange="upSelCustomOpt(${si},'note',this.value)" placeholder="Note commerciali (descrizione, motivazione...)" style="${WS}width:100%;font-size:11px;padding:4px 8px;border:1px solid #2a7ac4;border-radius:4px;color:#1a4f82;">`:''}</div></div>`;
+        h+=`</div>`;
+      }
+      h+=`</div>`;
+    });
+    h+=`</div>`;
+  });
+  const c=q.comm;const suC=(c.su_om+c.su_oe)*q.rateH*c.su_qty,smC=(c.sm_om+c.sm_oe)*q.rateH*c.sm_qty;
+  const lb=tx=>`<label class="lbl2" style="font-size:10px">${tx}</label>`;
+  const rowF=(lbl,val,f)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #F2F2F0;flex-wrap:wrap"><span style="flex:1 1 110px;font-size:13px;color:#3D3D3C;font-weight:500">${lbl}</span><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">${f}</div><span style="font-size:13px;font-weight:700;min-width:85px;text-align:right;color:#3D3D3C">${fmtE(val)}</span></div>`;
+  h+=`<div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;margin-top:14px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;gap:8px"><i class="ti ti-home-2" style="color:#F08A05;font-size:15px"></i><span class="lbl">Attività in fabbrica (FAT)</span></div><div style="padding:14px 16px">${(()=>{const m2=q.margine/100,p2=q.provv/100,a2=q.altro/100;function fatP(v){const pM=m2<1?Math.round(v/(1-m2)):v;const pP=p2<1?Math.round(pM/(1-p2)):pM;const pA=a2<1?Math.round(pP/(1-a2)):pP;return{pM,pP,pA};}const rS=fatP(suC),rT=fatP(smC);function bandaFAT(lbl,costo,r,campi){return `<div style="padding:9px 0;border-bottom:1px solid #F2F2F0;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div style="font-size:13px;color:#3D3D3C;font-weight:500;margin-bottom:6px">${lbl}</div><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">${campi}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:160px"><div style="font-size:13px;font-weight:700;color:#3D3D3C;margin-bottom:3px">${fmtE(costo)}</div><div style="display:flex;justify-content:space-between;align-items:center;width:160px;background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:3px 8px"><span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462">Min. ${q.margine}%</span><span style="font-size:12px;font-weight:700;color:#3D3D3C">${fmtE(r.pM)}</span></div><div style="display:flex;justify-content:space-between;align-items:center;width:160px;background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:3px 8px"><span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462">+Provv. ${q.provv}%</span><span style="font-size:12px;font-weight:700;color:#3D3D3C">${fmtE(r.pP)}</span></div><div style="display:flex;justify-content:space-between;align-items:center;width:160px;background:#FDF9F4;border:1.5px solid #F08A05;border-radius:3px;padding:3px 8px"><span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#c07200">+Leva ${q.altro}%</span><span style="font-size:12px;font-weight:700;color:#F08A05">${fmtE(r.pA)}</span></div></div></div>`;}return bandaFAT('Start-Up in fabbrica (S)',suC,rS,lb('Qtà')+iT(c.su_qty,`upCF('su_qty',this.value)`,'',46)+lb('Ore mec.')+iT(c.su_om,`upCF('su_om',this.value)`,'',52)+lb('Ore ele.')+iT(c.su_oe,`upCF('su_oe',this.value)`,'',52))+bandaFAT('Smontaggio (T)',smC,rT,lb('Qtà')+iT(c.sm_qty,`upCF('sm_qty',this.value)`,'',46)+lb('Ore mec.')+iT(c.sm_om,`upCF('sm_om',this.value)`,'',52)+lb('Ore ele.')+iT(c.sm_oe,`upCF('sm_oe',this.value)`,'',52));})()}<div style="border-top:2px solid #E8E6E0;padding-top:8px">${(()=>{const m2=q.margine/100,p2=q.provv/100,a2=q.altro/100;const tot=suC+smC;const pM=m2<1?Math.round(tot/(1-m2)):tot;const pP=p2<1?Math.round(pM/(1-p2)):pM;const pA=a2<1?Math.round(pP/(1-a2)):pP;return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px"><span class="lbl">Totale FAT</span><span style="font-size:14px;font-weight:700;color:#F08A05">${fmtE(tot)}</span></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><div style="display:flex;justify-content:space-between;align-items:center;width:160px;background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:3px 8px"><span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462">Min. ${q.margine}%</span><span style="font-size:12px;font-weight:700;color:#3D3D3C">${fmtE(pM)}</span></div><div style="display:flex;justify-content:space-between;align-items:center;width:160px;background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:3px 8px"><span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462">+Provv. ${q.provv}%</span><span style="font-size:12px;font-weight:700;color:#3D3D3C">${fmtE(pP)}</span></div><div style="display:flex;justify-content:space-between;align-items:center;width:160px;background:#FDF9F4;border:1.5px solid #F08A05;border-radius:3px;padding:3px 8px"><span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#c07200">+Leva ${q.altro}%</span><span style="font-size:12px;font-weight:700;color:#F08A05">${fmtE(pA)}</span></div></div>`;})()}</div></div></div>`;
+  const s2=cS(q);const mod2=cMO(q);const pLevaM=q.altro/100<1?Math.round((q.provv/100<1?Math.round(mod2.pLinea/(1-q.provv/100)):mod2.pLinea)/(1-q.altro/100)):(q.provv/100<1?Math.round(mod2.pLinea/(1-q.provv/100)):mod2.pLinea);const pLinea2Tot=q.margine/100<1?Math.round((mod2.costoBase+s2.suC+s2.smC)/(1-q.margine/100)):(mod2.costoBase+s2.suC+s2.smC);const gar2=Math.round((pLinea2Tot+s2.commTot+s2.tivC+s2.costiViviTot)*0.021),met2=Math.max(mod2.allMPraw*0.012,2000);
+  const rowF2=(lbl,val)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #F2F2F0"><span style="font-size:13px;font-weight:500">${lbl}</span><span style="font-size:13px;font-weight:700">${fmtE(val)}</span></div>`;
+  h+=`<div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;margin-top:10px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;gap:8px"><i class="ti ti-tool" style="color:#F08A05;font-size:15px"></i><span class="lbl">Ore Generali, Trasporti acquisti e Consumabili</span></div><div style="padding:14px 16px">${(()=>{
+  var mod2=cMO(q);var c=q.comm;
+  var lb=function(tx){return '<label class="lbl2" style="font-size:10px">'+tx+'</label>';};
+  var isAutoY=c.y_om==null&&c.y_oe==null&&c.y_mp==null;
+  var isAutoTia=c.tia_mp==null;
+  var isAutoCo=c.co_mp==null;
+  var y_om=mod2.y_om,y_oe=mod2.y_oe,y_mp=mod2.y_mp;
+  var tia=mod2.tia_mp,co=mod2.co_mp,yCost=mod2.yCost;
+  var m2=q.margine/100,p2=q.provv/100,a2=q.altro/100;
+  function marg(v){var pM=m2<1?Math.round(v/(1-m2)):v;var pP=p2<1?Math.round(pM/(1-p2)):pM;var pA=a2<1?Math.round(pP/(1-a2)):pP;return{pM:pM,pP:pP,pA:pA};}
+  var rY=marg(yCost),rTia=marg(tia),rCo=marg(co),rTot=marg(yCost+tia+co);
+  function pc(costo,r){
+    var h='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:160px">';
+    h+='<div style="font-size:13px;font-weight:700;color:#3D3D3C;margin-bottom:3px">'+fmtE(costo)+'</div>';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;width:160px;background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:3px 8px">';
+    h+='<span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462">Min. '+q.margine+'%</span>';
+    h+='<span style="font-size:12px;font-weight:700;color:#3D3D3C">'+fmtE(r.pM)+'</span></div>';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;width:160px;background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:3px 8px">';
+    h+='<span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462">+Provv. '+q.provv+'%</span>';
+    h+='<span style="font-size:12px;font-weight:700;color:#3D3D3C">'+fmtE(r.pP)+'</span></div>';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;width:160px;background:#FDF9F4;border:1.5px solid #F08A05;border-radius:3px;padding:3px 8px">';
+    h+='<span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#c07200">+Leva '+q.altro+'%</span>';
+    h+='<span style="font-size:12px;font-weight:700;color:#F08A05">'+fmtE(r.pA)+'</span></div>';
+    h+='</div>';
+    return h;
+  }
+  var btnAutoY=!isAutoY?'<button onclick="resetY()" style="padding:3px 8px;font-size:10px;font-family:Barlow Condensed,sans-serif;font-weight:600;color:#F08A05;border-color:#F08A05">&#8635; Auto</button>':'';
+  var btnAutoTia=!isAutoTia?'<button onclick="resetTia()" style="padding:3px 8px;font-size:10px;font-family:Barlow Condensed,sans-serif;font-weight:600;color:#F08A05;border-color:#F08A05">&#8635; Auto</button>':'';
+  var btnAutoCo=!isAutoCo?'<button onclick="resetCo()" style="padding:3px 8px;font-size:10px;font-family:Barlow Condensed,sans-serif;font-weight:600;color:#F08A05;border-color:#F08A05">&#8635; Auto</button>':'';
+  var bY='border:1px solid '+(isAutoY?'#D5D3CE':'#F08A05')+';border-radius:4px;';
+  var bTia='border:1px solid '+(isAutoTia?'#D5D3CE':'#F08A05')+';border-radius:4px;';
+  var bCo='border:1px solid '+(isAutoCo?'#D5D3CE':'#F08A05')+';border-radius:4px;';
+  var h='';
+  // Riga Y
+  h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid #F2F2F0">';
+  h+='<div style="flex:1;min-width:180px"><div style="font-size:13px;color:#3D3D3C;font-weight:500;margin-bottom:6px">Ore Generali Commessa (Y)</div>';
+  h+='<div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">';
+  h+=lb('MP &euro;')+iT(y_mp,"upC('y_mp',this.value)",bY,70);
+  h+=lb('Ore mec.')+iT(y_om,"upC('y_om',this.value)",bY,52);
+  h+=lb('Ore ele.')+iT(y_oe,"upC('y_oe',this.value)",bY,52);
+  h+=btnAutoY+'</div></div>'+pc(yCost,rY)+'</div>';
+  // Riga TIA
+  h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid #F2F2F0">';
+  h+='<div style="flex:1;min-width:180px"><div style="font-size:13px;color:#3D3D3C;font-weight:500;margin-bottom:6px">Trasporti e Imballaggi Acquisti (TIA) &mdash; 2%</div>';
+  h+='<div style="display:flex;gap:7px;align-items:center">';
+  h+=lb('MP &euro;')+iT(tia,"upC('tia_mp',this.value)",bTia,80);
+  h+=btnAutoTia+'</div></div>'+pc(tia,rTia)+'</div>';
+  // Riga CO
+  h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid #F2F2F0">';
+  h+='<div style="flex:1;min-width:180px"><div style="font-size:13px;color:#3D3D3C;font-weight:500;margin-bottom:6px">Consumabili (CO) &mdash; 2,2%</div>';
+  h+='<div style="display:flex;gap:7px;align-items:center">';
+  h+=lb('MP &euro;')+iT(co,"upC('co_mp',this.value)",bCo,80);
+  h+=btnAutoCo+'</div></div>'+pc(co,rCo)+'</div>';
+  // Totale
+  h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:2px solid #E8E6E0;padding-top:8px">';
+  h+='<div style="display:flex;align-items:center;gap:8px">';
+  h+='<span class="lbl">Totale Y + TIA + CO</span>';
+  h+='<span style="font-size:14px;font-weight:700;color:#F08A05">'+fmtE(yCost+tia+co)+'</span>';
+  h+='</div>';
+  h+=pc(yCost+tia+co,rTot)+'</div>';
+  return h;
+})()}</div></div>`;
+  h+='<div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;margin-top:10px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;gap:8px"><i class="ti ti-shield-check" style="color:#F08A05;font-size:15px"></i><span class="lbl">Garanzie e documentazione</span></div><div style="padding:14px 16px">';
+  h+=(()=>{const m2=q.margine/100,p2=q.provv/100,a2=q.altro/100;const garM=m2<1?Math.round(gar2/(1-m2)):gar2;const garP=p2<1?Math.round(garM/(1-p2)):garM;const garA=a2<1?Math.round(garP/(1-a2)):garP;const metM=met2;const metP=p2<1?Math.round((met2)/(1-p2)):met2;const metA=a2<1?Math.round(metP/(1-a2)):metP;const totM=garM+metM,totP=garP+metP,totA=garA+metA;const pilleCol=(costo,pM,pP,pA)=>"<div style=\"display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:160px\">"+"<div style=\"font-size:13px;font-weight:700;color:#3D3D3C;margin-bottom:3px\">"+fmtE(costo)+"</div>"+"<div style=\"display:flex;justify-content:space-between;align-items:center;width:160px;background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:3px 8px\">"+"<span style=\"font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462\">Min. "+q.margine+"%</span>"+"<span style=\"font-size:12px;font-weight:700;color:#3D3D3C\">"+fmtE(pM)+"</span></div>"+"<div style=\"display:flex;justify-content:space-between;align-items:center;width:160px;background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:3px 8px\">"+"<span style=\"font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462\">+Provv. "+q.provv+"%</span>"+"<span style=\"font-size:12px;font-weight:700;color:#3D3D3C\">"+fmtE(pP)+"</span></div>"+"<div style=\"display:flex;justify-content:space-between;align-items:center;width:160px;background:#FDF9F4;border:1.5px solid #F08A05;border-radius:3px;padding:3px 8px\">"+"<span style=\"font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#c07200\">+Leva "+q.altro+"%</span>"+"<span style=\"font-size:12px;font-weight:700;color:#F08A05\">"+fmtE(pA)+"</span></div>"+"</div>";return "<div style=\"display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid #F2F2F0\">"+"<div style=\"flex:1;min-width:160px\">"+"<div style=\"font-size:13px;color:#3D3D3C;font-weight:500\">Garanzie e completamenti (GAR — 2,1%)</div>"+"<div style=\"font-size:10px;color:#666462;margin-top:3px;font-style:italic\">Calcolato su: (Prezzo Linea + Commissioning + TIV + Costi Vivi) × 2,1% — poi marginalizzato</div>"+"<div style=\"font-size:11px;color:#3D3D3C;font-weight:600;margin-top:3px\">Base di calcolo: "+fmtE(pLinea2Tot+s2.commTot+s2.tivC+s2.costiViviTot)+"</div>"+"</div>"+pilleCol(gar2,garM,garP,garA)+"</div>"+"<div style=\"display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid #F2F2F0\">"+"<div style=\"flex:1;min-width:160px\">"+"<div style=\"font-size:13px;color:#3D3D3C;font-weight:500\">Manuali e traduzioni (MET — 1,2% min. €2.000)</div>"+"<div style=\"font-size:10px;color:#666462;margin-top:3px;font-style:italic\">Calcolato su: totale MP dei moduli e optional (incl. markup tecnologia) — valore non marginalizzato</div>"+"<div style=\"font-size:11px;color:#3D3D3C;font-weight:600;margin-top:3px\">Base di calcolo: "+fmtE(mod2.allMPraw)+"</div>"+"</div>"+pilleCol(met2,metM,metP,metA)+"</div>"+"<div style=\"display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:2px solid #E8E6E0;padding-top:8px\">"+"<div style=\"display:flex;align-items:center;gap:8px\">"+"<span class=\"lbl\">Totale GAR + MET</span>"+"<span style=\"font-size:14px;font-weight:700;color:#F08A05\">"+fmtE(gar2+met2)+"</span>"+"</div>"+pilleCol(gar2+met2,totM,totP,totA)+"</div>";})();
+  h+=(()=>{const mod3=cMO(q);const cur=getCurr(q);const cr=cur.code==='EUR'?1:cur.rate;const totOreLabel=mod3.totOreM+mod3.totOreE+' h ('+mod3.totOreM+' M + '+mod3.totOreE+' E)';const cBanner=q.comm;const oreS=(cBanner.su_om+cBanner.su_oe)*cBanner.su_qty;const oreT=(cBanner.sm_om+cBanner.sm_oe)*cBanner.sm_qty;const oreMAll=mod3.totOreM+cBanner.su_om*cBanner.su_qty+cBanner.sm_om*cBanner.sm_qty;const oreEAll=mod3.totOreE+cBanner.su_oe*cBanner.su_qty+cBanner.sm_oe*cBanner.sm_qty;const oreTotAll=oreMAll+oreEAll;const totOreAllLabel=oreTotAll+' h ('+oreMAll+' M + '+oreEAll+' E)';const costoOreTot=oreTotAll*q.rateH;const vP=p=>cur.code==='EUR'?fmtE(p):cur.sym+' '+Math.round(p*cr).toLocaleString('it-IT');const suC2=(cBanner.su_om+cBanner.su_oe)*q.rateH*cBanner.su_qty;const smC2=(cBanner.sm_om+cBanner.sm_oe)*q.rateH*cBanner.sm_qty;const m3=q.margine/100;const costoBaseTot=mod3.costoBase+suC2+smC2;const pLineaTot=m3<1?Math.round(costoBaseTot/(1-m3)):costoBaseTot;const p3=q.provv/100,a3=q.altro/100;const serv3=cS(q);const pLevaTot=a3<1?Math.round((p3<1?Math.round(pLineaTot/(1-p3)):pLineaTot)/(1-a3)):(p3<1?Math.round(pLineaTot/(1-p3)):pLineaTot);const garCosto3=Math.round((pLineaTot+serv3.commTot+serv3.tivC+serv3.costiViviTot)*0.021);const garMarg3=m3<1?Math.round(garCosto3/(1-m3)):garCosto3;const subTot=pLineaTot+mod3.met+garMarg3;const subTotProv=p3<1?Math.round(subTot/(1-p3)):subTot;const totLinea=a3<1?Math.round(subTotProv/(1-a3)):subTotProv;const plProv=subTotProv;const plAlt=totLinea;const cvTot3=serv3.commTot+serv3.tivC+serv3.costiViviTot;const cvTotProv3=p3<1?Math.round(cvTot3/(1-p3)):cvTot3;const cvTotLeva3=a3<1?Math.round(cvTotProv3/(1-a3)):cvTotProv3;const totComm3=totLinea+cvTotLeva3;const margineMP3=totComm3>0?Math.round((1-(mod3.costoMPtot/totComm3))*1000)/10:0;return '<div style="background:#3D3D3C;border-radius:4px;padding:14px 18px;margin-top:14px">'+'<div class="lbl" style="color:#F08A05;margin-bottom:12px;font-size:10px">Riepilogo costi e prezzi linea</div>'+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+'<div><div class="lbl2" style="color:rgba(255,255,255,0.5);font-size:9px;margin-bottom:6px">COSTI</div>'+'<div style="display:flex;flex-direction:column;gap:5px">'+'<div style="display:flex;justify-content:space-between;font-size:12px;color:#fff"><span style="opacity:0.75">Totale MP (incl. Y, TIA, CO, GAR)</span><span style="font-weight:700">'+fmtE(mod3.costoMPtot)+'</span></div>'+'<div style="display:flex;justify-content:space-between;font-size:12px;color:#fff"><span style="opacity:0.75">Totale ore '+totOreAllLabel+'</span><span style="font-weight:700">'+fmtE(costoOreTot)+'</span></div>'+'<div style="display:flex;justify-content:space-between;font-size:13px;color:#fff;border-top:1px solid rgba(255,255,255,0.2);padding-top:6px;margin-top:3px"><span style="font-weight:600">Costo totale</span><span style="font-weight:700;color:#F08A05">'+fmtE(mod3.costoMPtot+costoOreTot)+'</span></div>'+'</div></div>'+'<div><div class="lbl2" style="color:rgba(255,255,255,0.5);font-size:9px;margin-bottom:6px">PREZZI</div>'+'<div style="display:flex;flex-direction:column;gap:5px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#fff"><span style="opacity:0.75">1. Prezzo Linea (marg. '+q.margine+'%)</span><span style="font-weight:700">'+vP(pLineaTot)+'</span></div><div style="display:flex;justify-content:space-between;font-size:12px;color:#fff"><span style="opacity:0.75">2. MET</span><span style="font-weight:700">'+vP(mod3.met)+'</span></div><div style="display:flex;justify-content:space-between;font-size:12px;color:#fff"><span style="opacity:0.75">3. GAR marginalizzato</span><span style="font-weight:700">'+vP(garMarg3)+'</span></div><div style="display:flex;justify-content:space-between;font-size:12px;color:#fff;border-top:1px solid rgba(255,255,255,0.15);padding-top:5px;margin-top:3px"><span style="font-weight:600">Sub Totale (1+2+3)</span><span style="font-weight:700">'+vP(subTot)+'</span></div><div style="display:flex;justify-content:space-between;font-size:12px;color:#fff"><span style="opacity:0.75">+ Provvigioni ('+q.provv+'%)</span><span style="font-weight:700">'+vP(subTotProv)+'</span></div><div style="display:flex;justify-content:space-between;font-size:13px;color:#fff;border-top:1px solid rgba(255,255,255,0.2);padding-top:6px;margin-top:3px"><span style="font-weight:600">+ Leva ('+q.altro+'%)</span><span style="font-weight:700;color:#F08A05">'+vP(totLinea)+'</span></div></div></div>'+('<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.2);padding-top:10px"><span style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.6)">Margine a MP</span><span style="font-size:18px;font-weight:700;color:'+( margineMP3>=50?'#3d9e28':margineMP3>=40?'#F08A05':'#E24B4A')+'">'+margineMP3+'%</span></div>')+'</div>';})();
+  h+='</div></div>';
+  return h;
+}
+
+function pgK(q,t){
+  const c=q.comm,rows=c.rows;const gp=cGP(rows);const def=q.lineaTipoId!=null?COMM_DEF[q.lineaTipoId]:null;const wS=def?.wG&&gp<def.wG;const nm=['Start & Stop','Industriale','Consumer','Interfogliato','Altro'];
+  const rU=resolveRow(rows.U),rV=resolveRow(rows.V),rW=resolveRow(rows.W);const rowData={U:{...rows.U,ggOpTot:rU.nT*rU.ggOp,ggRVTot:rU.ggRip+rU.ggViag,tot:cCR(rows.U)},V:{...rows.V,ggOpTot:rV.nT*rV.ggOp,ggRVTot:rV.ggRip+rV.ggViag,tot:cCR(rows.V)},W:{...rows.W,ggOpTot:rW.nT*rW.ggOp,ggRVTot:rW.ggRip+rW.ggViag,tot:cCR(rows.W)}};
+  const totGgOp=rowData.U.ggOpTot+rowData.V.ggOpTot+rowData.W.ggOpTot;const totGgRV=rowData.U.ggRVTot+rowData.V.ggRVTot+rowData.W.ggRVTot;const p=q.provv/100,a=q.altro/100;const totComm=rowData.U.tot+rowData.V.tot+rowData.W.tot;const cur=getCurr(q);const cr=cur.code==='EUR'?1:cur.rate;const fmtFX=(v)=>cur.code==='EUR'?'':cur.sym+' '+Math.round(v*cr).toLocaleString('it-IT');
+  function commRow(act,label,row,rd,p,a){
+  const rv=resolveRow(row);
+  const isManRip=row.ggRip!=null;
+  const isManViag=row.ggViag!=null;
+  const ripStyle=`border:1px solid ${isManRip?'#F08A05':'#D5D3CE'};border-radius:4px;`;
+  const viagStyle=`border:1px solid ${isManViag?'#F08A05':'#D5D3CE'};border-radius:4px;`;
+  const btnRip=isManRip?`<button onclick="resetGgRip('${act}')" style="padding:2px 5px;font-size:9px;color:#F08A05;border-color:#F08A05;line-height:1">&#8635;</button>`:'';
+  const btnViag=isManViag?`<button onclick="resetGgViag('${act}')" style="padding:2px 5px;font-size:9px;color:#F08A05;border-color:#F08A05;line-height:1">&#8635;</button>`:'';
+  return`<tr style="border-bottom:1px solid #F2F2F0"><td style="padding:8px 10px;font-size:13px;font-weight:500;white-space:nowrap">${label}</td><td style="padding:8px 6px;text-align:center">${iT(row.nT,`upRow('${act}','nT',this.value)`,'',40)}</td><td style="padding:8px 6px;text-align:center">${iT(row.ggOp,`upRow('${act}','ggOp',this.value)`,'',46)}</td><td style="padding:8px 6px;text-align:center"><div style="display:flex;align-items:center;gap:2px">${iT(rv.ggRip,`upRow('${act}','ggRip',this.value)`,ripStyle,40)}${btnRip}</div></td><td style="padding:8px 6px;text-align:center"><div style="display:flex;align-items:center;gap:2px">${iT(rv.ggViag,`upRow('${act}','ggViag',this.value)`,viagStyle,40)}${btnViag}</div></td><td style="padding:8px 6px;text-align:center">${iTO(row.rateOp,`upRow('${act}','rateOp',this.value)`,64)}</td><td style="padding:8px 6px;text-align:center">${iTB(row.rateRV,`upRow('${act}','rateRV',this.value)`,64)}</td><td style="padding:8px 8px;text-align:center;background:#FFFAF4;border-left:1px solid #F08A05;border-right:1px solid #F08A05"><span style="font-size:13px;font-weight:700;color:#c07200">${rd.ggOpTot}</span></td><td style="padding:8px 8px;text-align:center;background:#EEF4FC;border-left:1px solid #2a7ac4;border-right:1px solid #2a7ac4"><span style="font-size:13px;font-weight:700;color:#1a4f82">${rd.ggRVTot}</span></td><td style="padding:8px 10px;text-align:right;font-size:13px;font-weight:700">${fmtE(rd.tot)}</td><td style="padding:8px 6px;text-align:right;font-size:12px;font-weight:600;color:#3D3D3C">${p>0?fmtE(Math.round(rd.tot/(1-p))):'—'}</td><td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:700;color:#F08A05">${a>0?fmtE(Math.round((p>0?Math.round(rd.tot/(1-p)):rd.tot)/(1-a))):'—'}</td></tr>`;
+}
+  const paese=q.clientNazione||'';const tp=TAR[paese];const cv=t.cv;let cvH='';
+  if(!paese){cvH=`<div style="padding:12px;background:#F9F9F8;border-radius:3px;font-size:13px">Inserisci la nazione del cliente (Step 1) per calcolare i costi vivi.</div>`;}
+  else if(!tp){cvH=`<div style="padding:12px;background:#FDF3E3;border-left:4px solid #F08A05;border-radius:3px;font-size:13px;color:#7A4800;display:flex;gap:8px;align-items:flex-start"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0;margin-top:1px"></i><div>Nessuna tariffa per <strong>${paese}</strong>.<br><button onclick="set({step:'cliente',showRateForm:true,rateFormNazione:'${paese}'})" style="margin-top:8px;font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;padding:5px 12px;background:#F08A05;color:#fff;border:none;border-radius:3px;cursor:pointer">Inserisci tariffe</button></div></div>`;}
+  else if(cv){const gA=(rows.U.ggOp+rows.U.ggRip+rows.U.ggViag)+(rows.V.ggOp+rows.V.ggRip+rows.V.ggViag)+(rows.W.ggOp+rows.W.ggRip+rows.W.ggViag);const cvFlags=[{key:"cv_auto",label:"Noleggio Auto",val:c.cv_auto!==false},{key:"cv_hotel",label:"Hotel",val:c.cv_hotel!==false},{key:"cv_voli",label:"Voli A/R",val:c.cv_voli!==false},{key:"cv_taxi",label:"Taxi",val:c.cv_taxi!==false},];const checkboxBar=`<div style="display:flex;gap:16px;flex-wrap:wrap;padding:8px 10px 10px;border-bottom:1px solid #E8E6E0;background:#F9F9F8;">${cvFlags.map(f=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:${f.val?600:400};color:${f.val?"#3D3D3C":"#999"};cursor:pointer"><input type="checkbox" ${f.val?"checked":""} data-cvkey="${f.key}" onchange="updateCvKey(this)" style="width:14px;height:14px;accent-color:#F08A05;cursor:pointer">${f.label}</label>`).join("")}</div>`;cvH=checkboxBar+`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F9F9F8;border-bottom:1px solid #E8E6E0">${['Voce','Base','Rate','Totale','+Provv.','+Leva'].map(h2=>`<th style="padding:8px 10px;text-align:${h2==='Totale'||h2==='Rate'||h2==='+Provv.'||h2==='+Leva'?'right':'left'};font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${h2==='+Leva'?'#F08A05':h2==='+Provv.'?'#666462':'inherit'}">${h2}</th>`).join('')}</tr></thead><tbody>${c.cv_auto!==false?"":""}<tr style="border-bottom:1px solid #F2F2F0;${c.cv_auto!==false?'':' opacity:0.4'}"><td style="padding:8px 10px;font-weight:500">Noleggio Auto</td><td style="padding:8px 10px;font-size:12px">${gA} gg</td><td style="padding:6px 10px;text-align:right"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><input type="number" value="${cv.rA}" onchange="updateCvRate('cv_rate_auto',this.value)" style="width:60px;padding:2px 4px;font-size:12px;border:1px solid #D5D3CE;border-radius:3px;text-align:right"><button onclick="resetCvRate('cv_rate_auto')" style="padding:1px 4px;font-size:9px;color:#F08A05;border-color:#F08A05;line-height:1">&#8635;</button></div></td><td style="padding:8px 10px;text-align:right;font-weight:700">${fmtE(cv.cA)}</td><td style="padding:8px 8px;text-align:right;font-size:12px;font-weight:600;color:#3D3D3C">${p>0?fmtE(Math.round(cv.cA/(1-p))):'—'}</td><td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:700;color:#F08A05">${a>0?fmtE(Math.round((p>0?Math.round(cv.cA/(1-p)):cv.cA)/(1-a))):'—'}</td></tr><tr style="border-bottom:1px solid #F2F2F0;${c.cv_hotel!==false?'':' opacity:0.4'}"><td style="padding:8px 10px;font-weight:500">Hotel</td><td style="padding:8px 10px;font-size:12px">${gp} gg-pax</td><td style="padding:6px 10px;text-align:right"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><input type="number" value="${cv.rH}" onchange="updateCvRate('cv_rate_hotel',this.value)" style="width:60px;padding:2px 4px;font-size:12px;border:1px solid #D5D3CE;border-radius:3px;text-align:right"><button onclick="resetCvRate('cv_rate_hotel')" style="padding:1px 4px;font-size:9px;color:#F08A05;border-color:#F08A05;line-height:1">&#8635;</button></div></td><td style="padding:8px 10px;text-align:right;font-weight:700">${fmtE(cv.cH)}</td><td style="padding:8px 8px;text-align:right;font-size:12px;font-weight:600;color:#3D3D3C">${p>0?fmtE(Math.round(cv.cH/(1-p))):'—'}</td><td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:700;color:#F08A05">${a>0?fmtE(Math.round((p>0?Math.round(cv.cH/(1-p)):cv.cH)/(1-a))):'—'}</td></tr><tr style="border-bottom:1px solid #F2F2F0;${c.cv_voli!==false?'':' opacity:0.4'}"><td style="padding:8px 10px;font-weight:500">Voli A/R</td><td style="padding:8px 10px;font-size:12px">${cv.nTot} tec.</td><td style="padding:6px 10px;text-align:right"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><input type="number" value="${cv.rV}" onchange="updateCvRate('cv_rate_volo',this.value)" style="width:60px;padding:2px 4px;font-size:12px;border:1px solid #D5D3CE;border-radius:3px;text-align:right"><button onclick="resetCvRate('cv_rate_volo')" style="padding:1px 4px;font-size:9px;color:#F08A05;border-color:#F08A05;line-height:1">&#8635;</button></div></td><td style="padding:8px 10px;text-align:right;font-weight:700">${fmtE(cv.cV)}</td><td style="padding:8px 8px;text-align:right;font-size:12px;font-weight:600;color:#3D3D3C">${p>0?fmtE(Math.round(cv.cV/(1-p))):'—'}</td><td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:700;color:#F08A05">${a>0?fmtE(Math.round((p>0?Math.round(cv.cV/(1-p)):cv.cV)/(1-a))):'—'}</td></tr><tr style="border-bottom:1px solid #F2F2F0;${c.cv_taxi!==false?'':' opacity:0.4'}"><td style="padding:8px 10px;font-weight:500">Taxi</td><td style="padding:8px 10px;font-size:12px">${cv.nTot} tec.</td><td style="padding:6px 10px;text-align:right"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><input type="number" value="${cv.rT}" onchange="updateCvRate('cv_rate_taxi',this.value)" style="width:60px;padding:2px 4px;font-size:12px;border:1px solid #D5D3CE;border-radius:3px;text-align:right"><button onclick="resetCvRate('cv_rate_taxi')" style="padding:1px 4px;font-size:9px;color:#F08A05;border-color:#F08A05;line-height:1">&#8635;</button></div></td><td style="padding:8px 10px;text-align:right;font-weight:700">${fmtE(cv.cT)}</td><td style="padding:8px 8px;text-align:right;font-size:12px;font-weight:600;color:#3D3D3C">${p>0?fmtE(Math.round(cv.cT/(1-p))):'—'}</td><td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:700;color:#F08A05">${a>0?fmtE(Math.round((p>0?Math.round(cv.cT/(1-p)):cv.cT)/(1-a))):'—'}</td></tr></tbody></table></div><div style="display:flex;justify-content:flex-end;gap:0;border-top:2px solid #E8E6E0"><div style="text-align:right;padding:7px 16px;min-width:110px"><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462;margin-bottom:2px">Totale €</div><div style="font-size:14px;font-weight:700;color:#3D3D3C">${fmtE(t.costiViviTot)}</div></div><div style="text-align:right;padding:7px 16px;min-width:110px;border-left:1px solid #E8E6E0"><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462;margin-bottom:2px">+Provv.</div><div style="font-size:14px;font-weight:700;color:#3D3D3C">${p>0?fmtE(Math.round(t.costiViviTot/(1-p))):'—'}</div></div><div style="text-align:right;padding:7px 16px;min-width:110px;border-left:1px solid #F08A05;background:#FDF9F4"><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#c07200;margin-bottom:2px">+Leva</div><div style="font-size:14px;font-weight:700;color:#F08A05">${a>0?fmtE(Math.round((p>0?Math.round(t.costiViviTot/(1-p)):t.costiViviTot)/(1-a))):'—'}${fmtFX(a>0?Math.round((p>0?Math.round(t.costiViviTot/(1-p)):t.costiViviTot)/(1-a)):(p>0?Math.round(t.costiViviTot/(1-p)):t.costiViviTot))?`<br><span style='font-size:14px;font-weight:700;color:#F08A05'>${cur.code} ${fmtFX(a>0?Math.round((p>0?Math.round(t.costiViviTot/(1-p)):t.costiViviTot)/(1-a)):(p>0?Math.round(t.costiViviTot/(1-p)):t.costiViviTot))}</span>`:''}</div></div></div>`;}
+  return`<div>${wS?`<div style="background:#FDF3E3;border:1.5px solid #F08A05;border-radius:4px;padding:12px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start"><i class="ti ti-alert-triangle" style="color:#F08A05;font-size:17px;flex-shrink:0;margin-top:1px"></i><div style="font-size:13px"><strong style="color:#7A4800">Attenzione:</strong> standard <strong>${nm[q.lineaTipoId]}</strong> = <strong>${def.wG}</strong> gg-pax. Attuale: <strong>${gp}</strong>.</div></div>`:''}
+  <div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;margin-bottom:12px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="display:flex;align-items:center;gap:8px"><i class="ti ti-plane-departure" style="color:#F08A05;font-size:15px"></i><span class="lbl">Commissioning c/o cliente</span></div>${q.lineaTipoId!=null?`<span style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:2px 8px;background:#3D3D3C;color:#fff;border-radius:2px">${nm[q.lineaTipoId]}</span>`:''}</div>
+  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#F9F9F8;border-bottom:1px solid #E8E6E0"><th rowspan="2" style="padding:8px 10px;text-align:left;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;vertical-align:bottom">Attività</th><th rowspan="2" style="padding:8px 6px;text-align:center;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;vertical-align:bottom">N° Tec.</th><th rowspan="2" style="padding:8px 6px;text-align:center;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;vertical-align:bottom">GG Op.</th><th rowspan="2" style="padding:8px 6px;text-align:center;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;vertical-align:bottom">GG Rip.</th><th rowspan="2" style="padding:8px 6px;text-align:center;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;vertical-align:bottom">GG Viag.</th><th rowspan="2" style="padding:8px 6px;text-align:center;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;color:#c07200;vertical-align:bottom">Rate Op.</th><th rowspan="2" style="padding:8px 6px;text-align:center;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;color:#1a4f82;vertical-align:bottom">Rate RV</th><th style="padding:5px 8px;text-align:center;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;background:#FDF9F4;color:#c07200;border-left:1px solid #F08A05;border-right:1px solid #F08A05;white-space:nowrap">Gg Operativi<br><span style="font-size:9px;font-weight:500">(N°Tec × GGop)</span></th><th style="padding:5px 8px;text-align:center;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;background:#EEF4FC;color:#1a4f82;border-left:1px solid #2a7ac4;border-right:1px solid #2a7ac4;white-space:nowrap">Gg Rip.+Viag.<br><span style="font-size:9px;font-weight:500">(GGrip + GGviag)</span></th><th rowspan="2" style="padding:8px 10px;text-align:right;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;vertical-align:bottom">Totale €</th><th rowspan="2" style="padding:8px 8px;text-align:right;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;color:#666462;vertical-align:bottom">+Provv.</th><th rowspan="2" style="padding:8px 10px;text-align:right;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;color:#F08A05;vertical-align:bottom">+Leva</th></tr></thead>
+  <tbody>${commRow('U','Rimontaggio (U)',rows.U,rowData.U,p,a)}${commRow('V','Start-up c/o cliente (V)',rows.V,rowData.V,p,a)}${commRow('W','Training (W)',rows.W,rowData.W,p,a)}</tbody>
+  <tfoot><tr style="border-top:2px solid #E8E6E0;background:#F9F9F8"><td colspan="7" style="padding:8px 10px"><span class="lbl">Totali</span></td><td style="padding:8px 8px;text-align:center;background:#FDF3E3;border-left:1px solid #F08A05;border-right:1px solid #F08A05"><span style="font-size:14px;font-weight:700;color:#c07200">${totGgOp}</span><br><span style="font-family:Barlow Condensed,sans-serif;font-size:9px;color:#c07200;font-weight:600">gg-tec</span></td><td style="padding:8px 8px;text-align:center;background:#E8EFF7;border-left:1px solid #2a7ac4;border-right:1px solid #2a7ac4"><span style="font-size:14px;font-weight:700;color:#1a4f82">${totGgRV}</span><br><span style="font-family:Barlow Condensed,sans-serif;font-size:9px;color:#1a4f82;font-weight:600">gg rip.+viag.</span></td><td style="padding:8px 10px;text-align:right;font-size:14px;font-weight:700;color:#F08A05">${fmtE(totComm)}</td><td style="padding:8px 8px;text-align:right;font-size:13px;font-weight:700;color:#3D3D3C">${p>0?fmtE(Math.round(totComm/(1-p))):'—'}</td><td style="padding:8px 10px;text-align:right;font-size:14px;font-weight:700;color:#F08A05">${a>0?fmtE(Math.round((p>0?Math.round(totComm/(1-p)):totComm)/(1-a))):'—'}</td></tr>${fmtFX(a>0?Math.round((p>0?Math.round(totComm/(1-p)):totComm)/(1-a)):(p>0?Math.round(totComm/(1-p)):totComm))?`<tr style='border-top:0'><td colspan='11'></td><td style='padding:3px 10px;text-align:right;font-size:14px;font-weight:700;color:#F08A05'>${cur.code} ${fmtFX(a>0?Math.round((p>0?Math.round(totComm/(1-p)):totComm)/(1-a)):(p>0?Math.round(totComm/(1-p)):totComm))}</td></tr>`:''}</tfoot></table></div>
+  <div style="padding:8px 16px 10px;background:#F9F9F8;font-size:11px;font-weight:500;display:flex;gap:20px;flex-wrap:wrap"><span>GG-pax: <strong>${gp}</strong>${def?.wG?' (soglia: '+def.wG+')':''}</span>${def?.wG&&gp>=def.wG?`<span style="color:#1a5212;font-weight:700">✓ OK</span>`:def?.wG?`<span style="color:#c0200a;font-weight:700">⚠ Sotto soglia</span>`:''}</div></div>
+  <div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;margin-bottom:12px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;gap:8px"><i class="ti ti-package" style="color:#F08A05;font-size:15px"></i><span class="lbl">Trasporti e imballaggi (TIV)</span></div><div style="padding:14px 16px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="flex:1 1 110px;font-size:13px;font-weight:500">Trasporti e imballaggi</span><div style="display:flex;gap:7px;align-items:center"><label class="lbl2" style="font-size:10px">Qtà</label>${iT(c.tiv_qty,"upCF('tiv_qty',this.value)",'',52)}<label class="lbl2" style="font-size:10px">€/un.</label>${iTR(c.tiv_unit,"upC('tiv_unit',this.value)",80)}</div></div></div><div style="display:flex;justify-content:flex-end;gap:0;border-top:1px solid #E8E6E0;margin-top:10px"><div style="text-align:right;padding:7px 16px;min-width:110px"><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462;margin-bottom:2px">Totale €</div><div style="font-size:14px;font-weight:700;color:#3D3D3C">${fmtE(t.tivC)}</div></div><div style="text-align:right;padding:7px 16px;min-width:110px;border-left:1px solid #E8E6E0"><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666462;margin-bottom:2px">+Provv.</div><div style="font-size:14px;font-weight:700;color:#3D3D3C">${p>0?fmtE(Math.round(t.tivC/(1-p))):'—'}</div></div><div style="text-align:right;padding:7px 16px;min-width:110px;border-left:1px solid #F08A05;background:#FDF9F4"><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#c07200;margin-bottom:2px">+Leva</div><div style="font-size:14px;font-weight:700;color:#F08A05">${a>0?fmtE(Math.round((p>0?Math.round(t.tivC/(1-p)):t.tivC)/(1-a))):'—'}${fmtFX(a>0?Math.round((p>0?Math.round(t.tivC/(1-p)):t.tivC)/(1-a)):(p>0?Math.round(t.tivC/(1-p)):t.tivC))?`<br><span style='font-size:14px;font-weight:700;color:#F08A05'>${cur.code} ${fmtFX(a>0?Math.round((p>0?Math.round(t.tivC/(1-p)):t.tivC)/(1-a)):(p>0?Math.round(t.tivC/(1-p)):t.tivC))}</span>`:''}</div></div></div></div>
+  <div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;margin-bottom:12px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="display:flex;align-items:center;gap:8px"><i class="ti ti-car" style="color:#F08A05;font-size:15px"></i><span class="lbl">Costi vivi di intervento</span></div>${paese&&tp?`<span style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 8px;background:#E8EFF7;color:#1a4f82;border-radius:2px">${paese}</span>`:''}</div><div style="padding:14px 16px">${cvH}</div></div>
+  <div style="background:#fff;border:1.5px solid #2a7ac4;border-radius:4px;padding:9px 13px"><div class="lbl" style="margin-bottom:7px;color:#1a4f82;font-size:10px">Riepilogo</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:5px">${(()=>{const p2=q.provv/100,a2=q.altro/100;const fn=(v)=>{const vLeva=a2>0?Math.round((p2>0?Math.round(v/(1-p2)):v)/(1-a2)):(p2>0?Math.round(v/(1-p2)):v);const fxLine=fmtFX(vLeva)?'<br><span style="font-size:10px;font-weight:700;color:#F08A05">'+cur.code+' '+fmtFX(vLeva)+'</span>':'';if(p2>0||a2>0)return fmtE(v)+'<br><span style="font-size:10px;color:#666">'+(p2>0?fmtE(Math.round(v/(1-p2))):'—')+'</span>'+'<br><span style="font-size:10px;color:#F08A05">'+(a2>0?fmtE(vLeva):'—')+'</span>'+fxLine;return fmtE(v)+fxLine;};return [['Commissioning',t.commTot],['Trasporti TIV',t.tivC],['Costi vivi',t.costiViviTot],['Totale',t.commTot+t.tivC+t.costiViviTot]].map(([l,v],i)=>`<div class="pb${i===3?' hi':''}"><div class="pl" style="${i===3?'color:#1a4f82':''}">${l}</div><div class="pv" style="font-size:11px;line-height:1.5;${i===3?'color:#2a7ac4':''}">${fn(v)}</div></div>`).join('');})()}</div></div></div>`;
+}
+
+function pgV(q,t){const vs=q.variazioni||[];const autoVar=[];const _m4=q.margine/100,_p4=q.provv/100;const _margP=(v)=>{const mm=_m4<1?Math.round(v/(1-_m4)):v;return _p4<1?Math.round(mm/(1-_p4)):mm;};const _onlyP=(v)=>_p4<1?Math.round(v/(1-_p4)):v;(q.selMods||[]).filter(s=>s.qty>0).forEach(sel=>{const b=MB[sel.midx];if(!b)return;if(sel.mp!=null&&sel.mp!==b.mp)autoVar.push({tipo:'Prezzo MP',mod:b.name,campo:'MP Base',orig:b.mp,nuovo:sel.mp,delta:sel.mp-b.mp,isE:true});if(sel.om!=null&&sel.om!==b.om)autoVar.push({tipo:'Ore',mod:b.name,campo:'Ore Mec.',orig:b.om,nuovo:sel.om,delta:sel.om-b.om,isE:false});if(sel.oe!=null&&sel.oe!==b.oe)autoVar.push({tipo:'Ore',mod:b.name,campo:'Ore Ele.',orig:b.oe,nuovo:sel.oe,delta:sel.oe-b.oe,isE:false});});if(q.lineaTipoId!=null){const def=COMM_DEF[q.lineaTipoId];const rows=q.comm.rows;const lms={U:'Rimontaggio',V:'Start-up',W:'Training'};['U','V','W'].forEach(act=>{const d=def[act],r=rows[act];if(r.nT!==d.nT)autoVar.push({tipo:'Commissioning',mod:`(${lms[act]})`,campo:'N° Tecnici',orig:d.nT,nuovo:r.nT,delta:r.nT-d.nT,isE:false});if(r.ggOp!==d.ggOp)autoVar.push({tipo:'Commissioning',mod:`(${lms[act]})`,campo:'GG Op.',orig:d.ggOp,nuovo:r.ggOp,delta:r.ggOp-d.ggOp,isE:false});if(r.rateOp!==d.rateOp)autoVar.push({tipo:'Rate',mod:`(${lms[act]})`,campo:'Rate Op.',orig:d.rateOp,nuovo:r.rateOp,delta:r.rateOp-d.rateOp,isE:true});if(r.rateRV!==d.rateRV)autoVar.push({tipo:'Rate',mod:`(${lms[act]})`,campo:'Rate RV',orig:d.rateRV,nuovo:r.rateRV,delta:r.rateRV-d.rateRV,isE:true});});}
+const fatDef={0:{su_om:320,su_oe:320,sm_om:100,sm_oe:100,su_qty:1,sm_qty:1},1:{su_om:320,su_oe:320,sm_om:100,sm_oe:100,su_qty:1,sm_qty:1},2:{su_om:400,su_oe:400,sm_om:270,sm_oe:190,su_qty:1,sm_qty:1},3:{su_om:400,su_oe:400,sm_om:100,sm_oe:100,su_qty:1,sm_qty:1},4:{su_om:300,su_oe:300,sm_om:100,sm_oe:100,su_qty:1,sm_qty:1}};const fd=fatDef[q.lineaTipoId!=null?q.lineaTipoId:4]||fatDef[4];const fatFields=[{f:'su_om',l:'Start-Up ore mec.'},{f:'su_oe',l:'Start-Up ore ele.'},{f:'su_qty',l:'Start-Up quantità'},{f:'sm_om',l:'Smontaggio ore mec.'},{f:'sm_oe',l:'Smontaggio ore ele.'},{f:'sm_qty',l:'Smontaggio quantità'},];const isOreField=(f)=>f==='su_om'||f==='su_oe'||f==='sm_om'||f==='sm_oe';const isQtyField=(f)=>f==='su_qty'||f==='sm_qty';fatFields.forEach(({f,l})=>{const cur=q.comm[f],def=fd[f];if(cur!==undefined&&cur!==def){const delta=cur-def;let imp=null;if(isOreField(f))imp=_margP(delta*q.rateH);autoVar.push({tipo:'FAT',mod:'Attività in fabbrica',campo:l,orig:def,nuovo:cur,delta:delta,isE:false,imp:imp});}});const mod4=cMO(q);if(q.comm.y_om!=null){const d=q.comm.y_om-Math.round(mod4.totOM*0.30);autoVar.push({tipo:'Ore Generali Y',mod:'',campo:'Y ore mec.',orig:Math.round(mod4.totOM*0.30),nuovo:q.comm.y_om,delta:d,isE:false,imp:_margP(d*q.rateH)});}if(q.comm.y_oe!=null){const d=q.comm.y_oe-Math.round(mod4.totOE*0.30);autoVar.push({tipo:'Ore Generali Y',mod:'',campo:'Y ore ele.',orig:Math.round(mod4.totOE*0.30),nuovo:q.comm.y_oe,delta:d,isE:false,imp:_margP(d*q.rateH)});}if(q.comm.y_mp!=null&&q.comm.y_mp!==1500){const d=q.comm.y_mp-1500;autoVar.push({tipo:'Ore Generali Y',mod:'',campo:'Y MP fisso',orig:1500,nuovo:q.comm.y_mp,delta:d,isE:true,imp:_margP(d)});}if(q.comm.tia_mp!=null){const d=q.comm.tia_mp-Math.round(mod4.allMPraw*0.02);autoVar.push({tipo:'TIA',mod:'',campo:'TIA importo',orig:Math.round(mod4.allMPraw*0.02),nuovo:q.comm.tia_mp,delta:d,isE:true,imp:_margP(d)});}if(q.comm.co_mp!=null){const d=q.comm.co_mp-Math.round(mod4.allMPraw*0.022);autoVar.push({tipo:'CO',mod:'',campo:'CO importo',orig:Math.round(mod4.allMPraw*0.022),nuovo:q.comm.co_mp,delta:d,isE:true,imp:_margP(d)});}const cv4=cS(q);const cvTar=TAR[q.clientNazione||'']||{};['cv_rate_auto','cv_rate_hotel','cv_rate_volo','cv_rate_taxi'].forEach(function(f){if(q.comm[f]!=null){const labels={'cv_rate_auto':'Rate Auto','cv_rate_hotel':'Rate Hotel','cv_rate_volo':'Rate Voli A/R','cv_rate_taxi':'Rate Taxi'};const stdKey={'cv_rate_auto':'auto','cv_rate_hotel':'hotel','cv_rate_volo':'volo','cv_rate_taxi':'taxi'}[f];const origRate=cvTar[stdKey]||0;const deltaRate=q.comm[f]-origRate;const qtaKey={'cv_rate_auto':'ggAuto','cv_rate_hotel':'ggHotel','cv_rate_volo':'nTot','cv_rate_taxi':'nTot'}[f];const qta=(cv4.cv&&cv4.cv[qtaKey])||0;const imp=_onlyP(deltaRate*qta);autoVar.push({tipo:'Costi vivi',mod:labels[f],campo:'Rate',orig:origRate,nuovo:q.comm[f],delta:deltaRate,isE:true,imp:imp});}});
+(q.selMods||[]).filter(s=>s.qty>0&&s.customOpt&&s.customOpt.on).forEach(sel=>{const b=MB[sel.midx];if(!b)return;const mpC=sel.customOpt.mp||0;autoVar.push({tipo:'Extra Custom',mod:b.name,campo:'MP extra',orig:0,nuovo:mpC,delta:mpC,isE:true,isCustom:true,note:sel.customOpt.note||'',imp:_margP(mpC)});});
+const IM=['Basso','Medio','Alto','Critico'];const TV=['Prezzo MP','Ore montaggio','Commissioning','Rate commissioning','Optional','Condizioni pagamento','Altro'];
+let h=`<div><div style="margin-bottom:14px"><h2 style="font-family:'Barlow',sans-serif;font-size:22px;font-weight:300;margin-bottom:4px">Variazioni commerciali</h2><div style="height:2px;width:60px;background:#F08A05;margin-bottom:6px"></div></div>`;
+if(autoVar.length){h+=`<div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;margin-bottom:16px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;gap:8px"><i class="ti ti-zoom-in-area" style="color:#F08A05;font-size:15px"></i><span class="lbl">Variazioni rilevate</span></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #E8E6E0;background:#F9F9F8">${['Sezione','Tipo','Campo','Standard','Offerto','Delta','Δ +Provv.'].map((h2,i)=>`<th style="padding:8px 12px;text-align:${i>=5?'right':'left'};font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase${i===6?';color:#F08A05':''}">${h2}</th>`).join('')}</tr></thead><tbody>${autoVar.map(v=>{if(v.isInfo)return'';if(v.isCustom){const ic=v.imp!=null?(v.imp>0?'#1a5212':'#c0200a'):'#999';const is2=v.imp!=null?(v.imp>0?'+':'')+fmtE(v.imp):'—';return`<tr style="border-bottom:1px solid #F2F2F0;background:#EEF4FB"><td style="padding:7px 12px;font-weight:600">${v.mod}</td><td style="padding:7px 12px"><span style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;padding:2px 7px;border-radius:2px;background:#2a7ac4;color:#fff">Extra Custom</span></td><td style="padding:7px 12px;font-size:11px;color:#1a4f82;font-style:italic">${v.note||'—'}</td><td style="padding:7px 12px;color:#999">—</td><td style="padding:7px 12px;font-weight:600;color:#2a7ac4">${fmtE(v.nuovo)}</td><td style="padding:7px 12px;font-weight:700;color:#1a5212">+${fmtE(v.delta)}</td><td style="padding:7px 12px;font-weight:700;text-align:right;color:${ic}">${is2}</td></tr>`;}const dc=v.delta<0?'#c0200a':v.delta>0?'#1a5212':'#3D3D3C';const ds=v.delta>0?'+':'';const ic2=v.imp!=null?(v.imp>0?'#1a5212':v.imp<0?'#c0200a':'#3D3D3C'):'#999';const is2=v.imp!=null?((v.imp>0?'+':'')+fmtE(v.imp)):'—';return`<tr style="border-bottom:1px solid #F2F2F0"><td style="padding:7px 12px;font-weight:600">${v.mod}</td><td style="padding:7px 12px"><span style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;padding:2px 7px;border-radius:2px;background:#F2F2F0">${v.tipo}</span></td><td style="padding:7px 12px">${v.campo}</td><td style="padding:7px 12px">${v.isE?fmtE(v.orig):v.orig}</td><td style="padding:7px 12px;font-weight:600">${v.isE?fmtE(v.nuovo):v.nuovo}</td><td style="padding:7px 12px;font-weight:700;color:${dc}">${ds}${v.isE?fmtE(v.delta):v.delta}</td><td style="padding:7px 12px;font-weight:700;text-align:right;color:${ic2}">${is2}</td></tr>`;}).join('')}</tbody></table></div></div>`;}
+else h+=`<div style="background:#E8F5E3;border-left:4px solid #3d9e28;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#1a5212;display:flex;gap:8px;align-items:center;border-radius:3px"><i class="ti ti-check" style="font-size:15px"></i>Nessuna variazione rispetto ai valori standard.</div>`;
+h+=`<div style="background:#fff;border:1px solid #E8E6E0;border-radius:4px;margin-bottom:12px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="display:flex;align-items:center;gap:8px"><i class="ti ti-notes" style="color:#F08A05;font-size:15px"></i><span class="lbl">Note commerciali (${vs.length})</span></div><button onclick="addV({tipo:'Altro',mod:'',motivazione:'',impatto:'Basso'})" style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:5px 12px;display:flex;align-items:center;gap:4px"><i class="ti ti-plus" style="font-size:12px"></i> Aggiungi</button></div><div>${!vs.length?`<div style="padding:14px 16px;font-size:13px;font-style:italic;opacity:0.5">Nessuna nota commerciale.</div>`:vs.map((v,i)=>{const ic={Basso:'#1a5212',Medio:'#7A4800',Alto:'#c0200a',Critico:'#8B0000'}[v.impatto]||'#3D3D3C';return`<div style="border-bottom:1px solid #F2F2F0;padding:12px 16px"><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:8px"><div style="display:flex;gap:8px;flex-wrap:wrap"><div><div class="lbl2" style="margin-bottom:3px;font-size:9px">Tipo</div><select onchange="upV(${i},{tipo:this.value})" style="${WS}font-size:12px;padding:3px 7px;border:1px solid #D5D3CE;border-radius:4px;">${TV.map(tv=>`<option value="${tv}" ${v.tipo===tv?'selected':''}>${tv}</option>`).join('')}</select></div><div><div class="lbl2" style="margin-bottom:3px;font-size:9px">Sezione</div><input type="text" value="${v.mod||''}" onchange="upV(${i},{mod:this.value})" placeholder="Es. Commissioning V..." style="${WS}font-size:12px;padding:3px 7px;width:140px;border:1px solid #D5D3CE;border-radius:4px;"></div><div><div class="lbl2" style="margin-bottom:3px;font-size:9px">Impatto</div><select onchange="upV(${i},{impatto:this.value})" style="${WS}font-size:12px;padding:3px 7px;border:1px solid ${ic};border-radius:4px;color:${ic};font-weight:600">${IM.map(im=>`<option value="${im}" ${v.impatto===im?'selected':''}>${im}</option>`).join('')}</select></div></div><div><div class="lbl2" style="margin-bottom:3px;font-size:9px">Motivazione</div><textarea onchange="upV(${i},{motivazione:this.value})" placeholder="Descrivi la variazione..." style="${WS}width:100%;font-size:12px;min-height:50px;resize:vertical;padding:5px 8px;border:1px solid #D5D3CE;border-radius:4px;">${v.motivazione||''}</textarea></div></div><button onclick="delV(${i})" style="padding:4px 8px;color:#c0200a;border-color:#F0C8C8;flex-shrink:0;align-self:flex-start"><i class="ti ti-trash" style="font-size:13px"></i></button></div></div>`;}).join('')}</div></div></div>`;
+return h;}
+
+function pgA(q,t){const cur=getCurr(q);const cr=cur.code==='EUR'?1:cur.rate;const sM=(q.selMods||[]).filter(s=>s.qty>0).sort((a,b)=>(MB[a.midx]?.cod||'').localeCompare(MB[b.midx]?.cod||''));const tl2=tL(q.lineaTipoId),tch2=techL(q.lineaTechId);const _modA=cMO(q),_servA=cS(q),_mA=q.margine/100,_pA=q.provv/100,_aA=q.altro/100;const _pLA=_mA<1?Math.round((_modA.costoBase+_servA.suC+_servA.smC)/(1-_mA)):(_modA.costoBase+_servA.suC+_servA.smC);const _garCA=Math.round((_pLA+_servA.commTot+_servA.tivC+_servA.costiViviTot)*0.021);const _garMA=_mA<1?Math.round(_garCA/(1-_mA)):_garCA;const _subA=_pLA+_modA.met+_garMA;const _subPA=_pA<1?Math.round(_subA/(1-_pA)):_subA;const _totFinA=_aA<1?Math.round(_subPA/(1-_aA)):_subPA;const _cvTA=_servA.commTot+_servA.tivC+_servA.costiViviTot;const _cvPA=_pA<1?Math.round(_cvTA/(1-_pA)):_cvTA;const _cvAA=_aA<1?Math.round(_cvPA/(1-_aA)):_cvPA;const _totCommA=_totFinA+_cvAA;const _cBannerA=q.comm;const _oreMtot=_modA.totOreM+_cBannerA.su_om*_cBannerA.su_qty+_cBannerA.sm_om*_cBannerA.sm_qty;const _oreEtot=_modA.totOreE+_cBannerA.su_oe*_cBannerA.su_qty+_cBannerA.sm_oe*_cBannerA.sm_qty;const _oreTotA=_oreMtot+_oreEtot;const _pv=(v)=>{const pp=_pA<1?Math.round(v/(1-_pA)):v;return _aA<1?Math.round(pp/(1-_aA)):pp;};const _pp=(v)=>_pA<1?Math.round(v/(1-_pA)):v;const _sumModsAlt=sM.reduce((acc,sel)=>{const rm=cMP(sel,q);return acc+(rm?rm.pAlt*sel.qty:0);},0);const _ytiacoCosto=_modA.yCost+_modA.tia_mp+_modA.co_mp;const _ytiacoMarg=_mA<1?Math.round(_ytiacoCosto/(1-_mA)):_ytiacoCosto;const _ytiacoLeva=_pv(_ytiacoMarg);const _commLeva=_pv(_servA.commTot);const _cvLeva=_pv(_servA.costiViviTot);const _tivLeva=_pv(_servA.tivC);const _garLeva=_pv(_garCA/(1-_mA<1?1:1));const _garMargLeva=_pA<1?Math.round(_garMA/(1-_pA)):_garMA; const _garFinLeva=_aA<1?Math.round(_garMargLeva/(1-_aA)):_garMargLeva;const _metLeva=_pv(_modA.met);
+let h=`<div><div style="margin-bottom:14px"><h2 style="font-family:'Barlow',sans-serif;font-size:22px;font-weight:300;margin-bottom:4px">Anteprima Offerta</h2><div style="height:2px;width:60px;background:#F08A05;margin-bottom:6px"></div></div>`;
+h+=`<div style="background:#3D3D3C;border-radius:4px;padding:20px 24px;color:#fff;margin-bottom:14px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px"><div>${LOGO_W}<div style="margin-top:12px"><div style="font-size:22px;font-weight:300;font-family:'Barlow',sans-serif">${q.propNum||'—'}</div><div style="font-size:15px;color:#F08A05;margin-top:3px;font-weight:500;font-family:'Barlow',sans-serif">${q.clientName||'—'}${q.clientNazione?' · '+q.clientNazione:''}</div></div></div><div style="text-align:right">${tl2?`<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;background:rgba(240,138,5,0.2);color:#F08A05;padding:3px 10px;border-radius:2px;display:inline-block;margin-bottom:4px">${tl2}</div><br>`:''} ${tch2?`<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;background:rgba(255,255,255,0.15);color:#fff;padding:3px 10px;border-radius:2px;display:inline-block;margin-bottom:4px">${tch2}</div><br>`:''}<div style="font-size:10px;opacity:0.5">${new Date(q.updatedAt).toLocaleDateString('it-IT')}</div></div></div><div style="display:flex;gap:20px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.15)"><div><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;opacity:0.6;text-transform:uppercase">Totale EUR</div><div style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:700">${fmtE(_totCommA)}</div></div>${cur.code!=='EUR'?`<div><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;opacity:0.6;text-transform:uppercase">${cur.code}</div><div style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:700;color:#F08A05">${cur.sym+' '+Math.round(_totCommA*cr).toLocaleString('it-IT')}</div></div>`:''}<div style="border-left:1px solid rgba(255,255,255,0.2);padding-left:20px"><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;opacity:0.6;text-transform:uppercase">Moduli</div><div style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:700">${sM.length}</div></div><div style="border-left:1px solid rgba(255,255,255,0.2);padding-left:20px"><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;opacity:0.6;text-transform:uppercase">Ore tot.</div><div style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:700">${_oreTotA}h</div></div></div></div>`;
+h+=`<div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;margin-bottom:12px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0"><span class="lbl">Dettaglio moduli</span></div><div style="overflow-x:auto">`;
+if(!sM.length)h+=`<div style="padding:2rem;font-size:13px;text-align:center;opacity:0.5">Nessun modulo selezionato.</div>`;
+else{h+=`<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #E8E6E0;background:#F9F9F8">${['Cod.','Modello','Qtà','Min.','Offerta EUR','Ore'].map(h2=>`<th style="padding:8px 10px;text-align:left;font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;text-transform:uppercase">${h2}</th>`).join('')}</tr></thead><tbody>`;sM.forEach((sel,idx)=>{const b=MB[sel.midx];if(!b)return;const r=cMP(sel,q);if(!r)return;const ao=[];b.opts.forEach((opt,oidx)=>{if((sel.opts||[])[oidx]){const oqty=(sel.optQty||{})[oidx]||1;ao.push(oqty>1?`${opt.n} ×${oqty}`:opt.n);}});const mu=r.mu;const muT=mu?`<span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:700;padding:1px 5px;border-radius:2px;background:${mu>=0.10?'#F0EDF8':'#E8EFF7'};color:${mu>=0.10?'#3a2a7c':'#1a4f82'};margin-left:4px">+${Math.round(mu*100)}%</span>`:'';h+=`<tr style="border-bottom:1px solid #F2F2F0;background:${idx%2?'#FAFAF9':'transparent'}"><td style="padding:7px 10px"><span style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;background:#3D3D3C;color:#fff;padding:2px 6px;border-radius:2px">${b.cod}</span></td><td style="padding:7px 10px;font-weight:600">${b.name}${muT}</td><td style="padding:7px 10px;text-align:right">${sel.qty}</td><td style="padding:7px 10px;text-align:right">${fmtE(r.pMin*sel.qty)}</td><td style="padding:7px 10px;text-align:right;font-weight:700">${fmtE(r.pAlt*sel.qty)}</td><td style="padding:7px 10px;text-align:right;font-size:12px">${(r.tOM+r.tOE)*sel.qty}h</td></tr>${ao.length?`<tr><td></td><td colspan="5" style="padding:2px 10px 7px;font-size:11px"><span style="color:#F08A05;font-weight:600">Optional:</span> ${ao.join(' · ')}</td></tr>`:''}`});h+=`</tbody></table>`;}
+h+=`</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div style="background:#fff;border:1px solid #E8E6E0;border-radius:4px;padding:14px"><div class="lbl" style="margin-bottom:10px">Riepilogo economico</div><div style="height:2px;background:#3D3D3C;margin-bottom:10px"></div><div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0;margin-bottom:4px"><div></div><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:#999;padding:0 8px 4px;text-align:right;min-width:80px">Base</div><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:#999;padding:0 8px 4px;text-align:right;min-width:80px">+Provv.</div><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:#F08A05;padding:0 0 4px;text-align:right;min-width:80px">+Leva</div></div>${[['Moduli e Optional',sM.reduce((acc,sel)=>{const rm=cMP(sel,q);return acc+(rm?rm.pMin*sel.qty:0);},0),_pp(sM.reduce((acc,sel)=>{const rm=cMP(sel,q);return acc+(rm?rm.pMin*sel.qty:0);},0)),_sumModsAlt],['Ore Gen., TIA e CO',_ytiacoMarg,_pp(_ytiacoMarg),_ytiacoLeva],['FAT (S+T)',t.suC+t.smC,_pp(t.suC+t.smC),_pv(t.suC+t.smC)],['Commissioning',t.commTot,_pp(t.commTot),_commLeva],['Costi vivi',t.costiViviTot,_pp(t.costiViviTot),_cvLeva],['Trasporti TIV',t.tivC,_pp(t.tivC),_tivLeva],['Garanzie GAR',_garMA,_pp(_garMA),_garFinLeva],['Manuali MET',t.met,_pp(t.met),_metLeva]].map(([l,b,pp,f])=>`<div style="display:grid;grid-template-columns:1fr auto auto auto;font-size:12px;padding:4px 0;border-bottom:1px solid #F2F2F0"><span style="font-weight:500">${l}</span><span style="font-weight:500;color:#888;text-align:right;padding-right:8px;min-width:80px">${fmtE(b)}</span><span style="font-weight:500;color:#888;text-align:right;padding-right:8px;min-width:80px">${fmtE(pp)}</span><span style="font-weight:700;text-align:right;min-width:80px">${fmtE(f)}</span></div>`).join('')}<div style="display:grid;grid-template-columns:1fr auto auto auto;font-size:14px;font-weight:700;padding:8px 0;border-top:2px solid #3D3D3C;margin-top:2px"><span>Totale EUR</span><span style="color:#888;text-align:right;padding-right:8px;min-width:80px;font-size:12px">${fmtE(_subA)}</span><span style="color:#888;text-align:right;padding-right:8px;min-width:80px;font-size:12px">${fmtE(_subPA)}</span><span style="color:#F08A05;text-align:right;min-width:80px">${fmtE(_totCommA)}</span></div>${cur.code!=='EUR'?`<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#F08A05;padding-top:3px"><span>${cur.code}</span><span>${cur.sym+' '+Math.round(_totCommA*cr).toLocaleString('it-IT')}</span></div>`:''}</div><div style="background:#fff;border:1px solid #E8E6E0;border-radius:4px;padding:14px"><div class="lbl" style="margin-bottom:10px">Parametri</div><div style="height:2px;background:#3D3D3C;margin-bottom:10px"></div>${[['Tipologia',tl2||'—'],['Tecnologia',tch2||'—'],['Nazione',q.clientNazione||'—'],['Rate H',fmtE(q.rateH)+'/h'],['Margine',q.margine+'%'],['Provvigioni',q.provv+'%'],['Valuta',getCurr(q).code]].map(([l,v])=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid #F2F2F0"><span style="font-weight:500">${l}</span><span style="font-weight:700">${v}</span></div>`).join('')}</div></div></div>`;return h;}
+
+function pgApp(q,t){
+  const flow=['bozza','revisione','approvazione','approvato','emesso'];
+  const vC=(q.variazioni||[]).filter(v=>v.impatto==='Critico'||v.impatto==='Alto');
+  const approverCard=(key,lbl,desc)=>{const ok=q[key];const log=q[key+'Log'];return`<div style="display:flex;align-items:flex-start;gap:12px;padding:16px;border:1px solid ${ok?'#3d9e28':'#E8E6E0'};border-left:4px solid ${ok?'#3d9e28':'#D5D3CE'};border-radius:4px;background:${ok?'#F2FAF0':'#FAFAF9'};margin-bottom:12px"><div style="width:44px;height:44px;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);background:${ok?'#3d9e28':'#D5D3CE'};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ${ok?'ti-shield-check':'ti-shield'}" style="font-size:20px;color:#fff"></i></div><div style="flex:1"><div style="font-size:15px;font-weight:600;margin-bottom:3px">${lbl}</div><div style="font-size:12px;color:${ok?'#1a5212':'#666462'};margin-bottom:${ok?'8':'12'}px">${ok?`Approvato il ${fmtTs(q[key+'Ts'])}`:desc}</div>${ok&&log?`<div style="font-size:11px;color:#1a5212;padding:6px 10px;background:#E8F5E3;border-radius:3px;font-weight:600">✓ ${log.approver} · ${log.email} · ${fmtTs(log.ts)}</div>`:`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button onclick="richiestaOTP('${key}')" class="btn-o" style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:8px 18px;display:flex;align-items:center;gap:6px"><i class="ti ti-mail" style="font-size:13px"></i> Invia codice OTP</button><span style="font-size:11px;color:#666462">→ ${APPROVERS[key].email}</span></div>`}</div>${ok?`<button onclick="revocaApprovazione('${key}')" style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:600;padding:4px 10px;color:#c0200a;border-color:#F0C8C8;flex-shrink:0">Revoca</button>`:''}</div>`;};
+  return`<div>${tGen(q)}${vC.length?`<div style="background:#FDE8E8;border:1.5px solid #E24B4A;border-radius:4px;padding:12px 16px;margin-bottom:12px;display:flex;gap:8px;align-items:flex-start"><i class="ti ti-alert-circle" style="font-size:18px;color:#c0200a;flex-shrink:0;margin-top:1px"></i><div><div style="font-size:13px;font-weight:700;color:#c0200a;margin-bottom:4px">${vC.length} variazione${vC.length>1?'i':''} ad alto impatto</div>${vC.map(v=>`<div style="font-size:12px;margin-bottom:2px">• ${v.tipo}${v.mod?' — '+v.mod:''}: ${v.motivazione||'—'}</div>`).join('')}</div></div>`:''}
+  <div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;margin-bottom:12px;overflow:hidden"><div style="padding:10px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;gap:8px"><i class="ti ti-git-branch" style="color:#F08A05;font-size:15px"></i><span class="lbl">Workflow</span></div><div style="padding:16px;display:flex;position:relative"><div style="position:absolute;top:29px;left:32px;right:32px;height:2px;background:#E8E6E0;z-index:0"></div>${flow.map((s,i)=>{const sc=SM[s];const isA=q.status===s;const done=i<flow.indexOf(q.status);return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;z-index:1;min-width:60px"><div onclick="upQF({status:'${s}'})" style="width:28px;height:28px;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);background:${done?'#F08A05':isA?'#3D3D3C':'#E8E6E0'};display:flex;align-items:center;justify-content:center;cursor:pointer"><i class="ti ${done?'ti-check':'ti-circle'}" style="font-size:12px;color:${done||isA?'#fff':'#3D3D3C'}"></i></div><span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;text-transform:uppercase;color:${isA?'#3D3D3C':'#3D3D3C'};text-align:center;opacity:${done||isA?1:0.5}">${sc.l}</span></div>`;}).join('')}</div></div>
+  <div style="background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px;overflow:hidden"><div style="padding:12px 16px;background:#F2F2F0;border-bottom:1px solid #E8E6E0;display:flex;align-items:center;gap:8px"><i class="ti ti-shield-lock" style="color:#F08A05;font-size:15px"></i><span class="lbl">Approvazioni — OTP via email (48h)</span></div>
+  <div style="padding:16px"><div style="padding:10px 14px;background:#EEF4FC;border-left:3px solid #2a7ac4;border-radius:3px;margin-bottom:16px;font-size:12px;color:#1a4f82;font-weight:500;line-height:1.6">Ogni approvatore riceve un codice OTP via email, valido <strong>48 ore</strong>. Va inserito nell'applicazione per registrare l'approvazione con timestamp e audit trail.</div>
+  ${approverCard('cfok','CFO','Approvazione finanziaria richiesta')}
+  ${approverCard('admk','Amministratore','Firma autorizzativa richiesta')}
+  ${q.cfok&&q.admk?`<div style="padding:12px 16px;background:#E8F5E3;border:1px solid #3d9e28;border-left:4px solid #3d9e28;border-radius:4px;font-size:13px;color:#1a5212;display:flex;gap:10px;align-items:center;font-weight:600;margin-top:4px"><i class="ti ti-shield-check" style="font-size:18px"></i>Offerta completamente autorizzata.</div>`:`<div style="padding:8px 12px;background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;font-size:12px;font-weight:500">In attesa: ${[!q.cfok&&'CFO',!q.admk&&'Amministratore'].filter(Boolean).join(' e ')}.</div>`}
+  </div></div></div>`;
+}
+
+function pgO(q,t){const cur=getCurr(q);const cr=cur.code==='EUR'?1:cur.rate;const auth=q.cfok&&q.admk;const tl2=tL(q.lineaTipoId),tch2=techL(q.lineaTechId);const _modO=cMO(q),_servO=cS(q),_mO=q.margine/100,_pO=q.provv/100,_aO=q.altro/100;const _pLO=_mO<1?Math.round((_modO.costoBase+_servO.suC+_servO.smC)/(1-_mO)):(_modO.costoBase+_servO.suC+_servO.smC);const _garCO=Math.round((_pLO+_servO.commTot+_servO.tivC+_servO.costiViviTot)*0.021);const _garMO=_mO<1?Math.round(_garCO/(1-_mO)):_garCO;const _subO=_pLO+_modO.met+_garMO;const _subPO=_pO<1?Math.round(_subO/(1-_pO)):_subO;const _totFinO=_aO<1?Math.round(_subPO/(1-_aO)):_subPO;const _cvTO=_servO.commTot+_servO.tivC+_servO.costiViviTot;const _cvPO=_pO<1?Math.round(_cvTO/(1-_pO)):_cvTO;const _cvAO=_aO<1?Math.round(_cvPO/(1-_aO)):_cvPO;const _totCommO=_totFinO+_cvAO;const _pvO=(v)=>{const pp=_pO<1?Math.round(v/(1-_pO)):v;return _aO<1?Math.round(pp/(1-_aO)):pp;};const _ppO=(v)=>_pO<1?Math.round(v/(1-_pO)):v;const _sM2=(q.selMods||[]).filter(s=>s.qty>0);const _sumModsO=_sM2.reduce((acc,sel)=>{const rm=cMP(sel,q);return acc+(rm?rm.pMin*sel.qty:0);},0);const _sumModsAltO=_sM2.reduce((acc,sel)=>{const rm=cMP(sel,q);return acc+(rm?rm.pAlt*sel.qty:0);},0);const _ytiacoCostoO=_modO.yCost+_modO.tia_mp+_modO.co_mp;const _ytiacoMargO=_mO<1?Math.round(_ytiacoCostoO/(1-_mO)):_ytiacoCostoO;const _ytiacoLevaO=_pvO(_ytiacoMargO);const _commLevaO=_pvO(_servO.commTot);const _cvLevaO=_pvO(_servO.costiViviTot);const _tivLevaO=_pvO(_servO.tivC);const _garMargLevaO=_pO<1?Math.round(_garMO/(1-_pO)):_garMO;const _garFinLevaO=_aO<1?Math.round(_garMargLevaO/(1-_aO)):_garMargLevaO;const _metLevaO=_pvO(_modO.met);const _oreOtot=_modO.totOreM+_modO.totOreE+q.comm.su_om*q.comm.su_qty+q.comm.su_oe*q.comm.su_qty+q.comm.sm_om*q.comm.sm_qty+q.comm.sm_oe*q.comm.sm_qty;const items=(q.selMods||[]).filter(s=>s.qty>0).sort((a,b)=>(MB[a.midx]?.cod||'').localeCompare(MB[b.midx]?.cod||'')).map(s=>{const b=MB[s.midx];if(!b)return null;const r=cMP(s,q);const ao=[];b.opts.forEach((opt,oidx)=>{if((s.opts||[])[oidx]){const oqty=(s.optQty||{})[oidx]||1;ao.push(oqty>1?`${opt.n} ×${oqty}`:opt.n);}});return{name:b.name,cod:b.cod,qty:s.qty,r,ao};}).filter(Boolean);
+return`<div><div style="display:flex;gap:8px;align-items:center;margin-bottom:14px"><h2 style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:300">Offerta finale</h2><button onclick="window.print()" style="margin-left:auto;font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;gap:5px;padding:7px 14px"><i class="ti ti-printer"></i> Stampa / PDF</button></div>
+<div style="background:#fff;border:1px solid #E8E6E0;border-radius:4px;overflow:hidden"><div style="background:#3D3D3C;padding:22px 26px;color:#fff"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px"><div>${LOGO_W}<div style="margin-top:14px"><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;opacity:0.6;text-transform:uppercase;margin-bottom:4px">Offerta commerciale</div><div style="font-family:'Barlow',sans-serif;font-size:22px;font-weight:300">${q.propNum||'—'}</div><div style="font-family:'Barlow',sans-serif;font-size:15px;color:#F08A05;margin-top:4px;font-weight:500">${q.clientName||'—'}${q.clientNazione?' — '+q.clientNazione:''}</div>${q.clientRef?`<div style="font-size:12px;opacity:0.5;margin-top:2px">${q.clientRef}</div>`:''}</div></div><div style="text-align:right">${tl2?`<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;background:rgba(240,138,5,0.2);color:#F08A05;padding:3px 10px;border-radius:2px;display:inline-block;margin-bottom:4px">${tl2}</div><br>`:''} ${tch2?`<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;background:rgba(255,255,255,0.15);color:#fff;padding:3px 10px;border-radius:2px;display:inline-block;margin-bottom:4px">${tch2}</div><br>`:''} ${auth?`<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;background:#E8F5E3;color:#1a5212;padding:3px 10px;border-radius:2px;display:inline-block">✓ Autorizzata</div>`:`<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;background:#FDF3E3;color:#7A4800;padding:3px 10px;border-radius:2px;display:inline-block">In attesa approvazione</div>`}<div style="font-size:10px;opacity:0.5;margin-top:5px">${new Date(q.updatedAt).toLocaleDateString('it-IT')}</div></div></div><div style="display:flex;gap:22px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.15)"><div><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;opacity:0.6;text-transform:uppercase">Totale EUR</div><div style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:700">${fmtE(_totCommO)}</div></div>${cur.code!=='EUR'?`<div><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;opacity:0.6;text-transform:uppercase">${cur.code}</div><div style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:700;color:#F08A05">${cur.sym+' '+Math.round(_totCommO*cr).toLocaleString('it-IT')}</div></div>`:''}<div style="border-left:1px solid rgba(255,255,255,0.2);padding-left:22px"><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;opacity:0.6;text-transform:uppercase">Moduli</div><div style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:700">${items.length}</div></div><div style="border-left:1px solid rgba(255,255,255,0.2);padding-left:22px"><div style="font-family:Barlow Condensed,sans-serif;font-size:10px;opacity:0.6;text-transform:uppercase">Ore tot.</div><div style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:700">${_oreOtot}h</div></div></div></div>
+<div style="padding:20px 26px">${!auth?`<div style="background:#FDF3E3;border-left:4px solid #F08A05;padding:9px 13px;margin-bottom:14px;font-size:13px;color:#7A4800;display:flex;gap:8px;align-items:center;font-weight:600"><i class="ti ti-alert-triangle"></i> Approvazione incompleta: ${[!q.cfok&&'CFO',!q.admk&&'Amministratore'].filter(Boolean).join(', ')}</div>`:''}
+<div class="lbl-o" style="margin-bottom:6px">Configurazione di linea</div><div style="height:2px;background:#3D3D3C;margin-bottom:12px"></div>
+${!items.length?`<div style="padding:1rem 0;opacity:0.5">Nessun modulo selezionato.</div>`:`<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #3D3D3C">${['Cod.','Modello','Qtà','Prezzo unit.','EUR',cur.code,'Ore'].map((h2,i)=>`<th style="padding:6px 7px;text-align:${i>1?'right':'left'};font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:700;text-transform:uppercase">${h2}</th>`).join('')}</tr></thead><tbody>${items.map((it,idx)=>{const mu=it.r.mu;const muT=mu?`<span style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:700;padding:1px 5px;border-radius:2px;background:${mu>=0.10?'#F0EDF8':'#E8EFF7'};color:${mu>=0.10?'#3a2a7c':'#1a4f82'};margin-left:4px">+${Math.round(mu*100)}%</span>`:'';return`<tr style="border-bottom:1px solid #F2F2F0;background:${idx%2?'#FAFAF9':'transparent'}"><td style="padding:7px"><span style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;background:#3D3D3C;color:#fff;padding:2px 6px;border-radius:2px">${it.cod}</span></td><td style="padding:7px;font-weight:600">${it.name}${muT}</td><td style="padding:7px;text-align:right">${it.qty}</td><td style="padding:7px;text-align:right;font-weight:600">${fmtE(it.r.pAlt)}</td><td style="padding:7px;text-align:right;font-weight:700">${fmtE(it.r.pAlt*it.qty)}</td><td style="padding:7px;text-align:right;font-weight:700;color:${cur.code!=='EUR'?'#F08A05':'inherit'}">${cur.code==='EUR'?fmtE(it.r.pAlt*it.qty):cur.sym+' '+Math.round(it.r.pAlt*it.qty*cr).toLocaleString('it-IT')}</td><td style="padding:7px;text-align:right;font-size:12px">${(it.r.tOM+it.r.tOE)*it.qty}h</td></tr>${it.ao.length?`<tr><td></td><td colspan="6" style="padding:2px 7px 7px;font-size:11px"><span style="color:#F08A05;font-weight:600">Optional:</span> ${it.ao.join(' · ')}</td></tr>`:''}`}).join('')}</tbody></table>`}
+<div style="margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+<div><div class="lbl" style="margin-bottom:7px">Riepilogo economico</div><div style="height:2px;background:#3D3D3C;margin-bottom:7px"></div><div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0;margin-bottom:4px"><div></div><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:#999;padding:0 8px 4px;text-align:right;min-width:80px">Base</div><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:#999;padding:0 8px 4px;text-align:right;min-width:80px">+Provv.</div><div style="font-family:Barlow Condensed,sans-serif;font-size:9px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:#F08A05;padding:0 0 4px;text-align:right;min-width:80px">+Leva</div></div>${[['Moduli e Optional',_sumModsO,_ppO(_sumModsO),_sumModsAltO],['Ore Gen., TIA e CO',_ytiacoMargO,_ppO(_ytiacoMargO),_ytiacoLevaO],['FAT (S+T)',t.suC+t.smC,_ppO(t.suC+t.smC),_pvO(t.suC+t.smC)],['Commissioning',t.commTot,_ppO(t.commTot),_commLevaO],['Costi vivi',t.costiViviTot,_ppO(t.costiViviTot),_cvLevaO],['Trasporti TIV',t.tivC,_ppO(t.tivC),_tivLevaO],['Garanzie GAR',_garMO,_ppO(_garMO),_garFinLevaO],['Manuali MET',t.met,_ppO(t.met),_metLevaO]].map(([l,b,pp,f])=>`<div style="display:grid;grid-template-columns:1fr auto auto auto;font-size:12px;padding:4px 0;border-bottom:1px solid #F2F2F0"><span style="font-weight:500">${l}</span><span style="font-weight:500;color:#888;text-align:right;padding-right:8px;min-width:80px">${fmtE(b)}</span><span style="font-weight:500;color:#888;text-align:right;padding-right:8px;min-width:80px">${fmtE(pp)}</span><span style="font-weight:700;text-align:right;min-width:80px">${fmtE(f)}</span></div>`).join('')}<div style="display:grid;grid-template-columns:1fr auto auto auto;font-size:14px;font-weight:700;padding:8px 0;border-top:2px solid #3D3D3C;margin-top:2px"><span>Totale EUR</span><span style="color:#888;text-align:right;padding-right:8px;min-width:80px;font-size:12px">${fmtE(_subO)}</span><span style="color:#888;text-align:right;padding-right:8px;min-width:80px;font-size:12px">${fmtE(_subPO)}</span><span style="color:#F08A05;text-align:right;min-width:80px">${fmtE(_totCommO)}</span></div>${cur.code!=='EUR'?`<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#F08A05;padding-top:3px"><span>${cur.code}</span><span>${cur.sym+' '+Math.round(_totCommO*cr).toLocaleString('it-IT')}</span></div>`:''}</div>
+<div>
+<div style="background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:14px;margin-bottom:12px"><div class="lbl" style="margin-bottom:10px">Log approvazioni</div>${[{key:'cfok',lbl:'CFO'},{key:'admk',lbl:'Amministratore'}].map(({key,lbl})=>{const ok=q[key];const log=q[key+'Log'];return`<div style="margin-bottom:10px"><div class="lbl2" style="margin-bottom:6px;font-size:9px">${lbl}</div>${ok&&log?`<div style="font-size:11px;color:#1a5212;font-weight:600;padding:6px 10px;background:#E8F5E3;border-radius:3px">✓ ${log.approver}<br><span style="font-weight:400">${fmtTs(log.ts)}</span></div>`:`<div style="font-size:11px;color:#c0200a;font-weight:500;padding:6px 10px;background:#FDE8E8;border-radius:3px">In attesa</div>`}</div>`;}).join('')}</div>
+<div style="background:#F9F9F8;border:1px solid #E8E6E0;border-radius:3px;padding:14px"><div class="lbl" style="margin-bottom:10px">Spazi firma</div>${[{r:'CFO',ok:q.cfok},{r:'Amministratore',ok:q.admk}].map(({r,ok})=>`<div style="margin-bottom:14px"><div class="lbl2" style="margin-bottom:18px">${r}</div><div style="border-bottom:1px solid #3D3D3C;margin-bottom:4px"></div><div style="font-size:11px;font-weight:${ok?600:500};color:${ok?'#1a5212':'#3D3D3C'}">${ok?'Firmato':'Firma e data'}</div></div>`).join('')}<div style="font-size:10px;opacity:0.5;margin-top:4px">Simplifying Tissue Converting®</div></div>
+</div></div></div></div></div>`;
+}
+
+function listPg(){const qs=S.quotes;return`<div style="padding:16px 22px 24px;background:#F2F2F0"><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px"><div><h1 style="font-family:'Barlow',sans-serif;font-size:26px;font-weight:300;margin-bottom:4px">Offerte attive</h1><div style="height:2px;width:60px;background:#F08A05;margin-bottom:6px"></div><div class="lbl2">${qs.length} offert${qs.length===1?'a':'e'} in sistema</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="esportaTutto()" style="padding:8px 14px;font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:5px"><i class="ti ti-download" style="font-size:13px"></i> Esporta JSON</button><button onclick="document.getElementById('imp-file').click()" style="padding:8px 14px;font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:5px"><i class="ti ti-upload" style="font-size:13px"></i> Importa JSON</button><button onclick="set({showJsonModal:true})" style="padding:8px 14px;font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:5px"><i class="ti ti-file-plus" style="font-size:13px"></i> Crea JSON</button><input id="imp-file" type="file" accept=".json" style="display:none" onchange="importaJSON(this)"><button class="btn-o" onclick="newQ()" style="padding:9px 20px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:7px"><i class="ti ti-plus" style="font-size:15px"></i> Nuova offerta</button></div></div>
+${!qs.length?`<div style="text-align:center;padding:4rem 0;background:#fff;border:1px solid #E8E6E0;border-top:3px solid #F08A05;border-radius:4px"><i class="ti ti-file-off" style="font-size:44px;display:block;margin-bottom:12px;opacity:0.2"></i><div style="font-size:16px;font-weight:300;margin-bottom:5px">Nessuna offerta</div><div style="font-size:13px;opacity:0.5">Clicca "Nuova offerta" per iniziare.</div></div>`:''}
+<div style="display:flex;flex-direction:column;gap:6px">${qs.map(q=>{const sc=SM[q.status]||SM.bozza,tt=cAll(q),nM=(q.selMods||[]).filter(s=>s.qty>0).length;const auth=q.cfok&&q.admk,cur2=getCurr(q);const _mod=cMO(q),_serv=cS(q),_m=q.margine/100,_p=q.provv/100,_a=q.altro/100;const _pL=_m<1?Math.round((_mod.costoBase+_serv.suC+_serv.smC)/(1-_m)):(_mod.costoBase+_serv.suC+_serv.smC);const _garC=Math.round((_pL+_serv.commTot+_serv.tivC+_serv.costiViviTot)*0.021);const _garM=_m<1?Math.round(_garC/(1-_m)):_garC;const _sub=_pL+_mod.met+_garM;const _subP=_p<1?Math.round(_sub/(1-_p)):_sub;const _totFin=_a<1?Math.round(_subP/(1-_a)):_subP;const _cvT=_serv.commTot+_serv.tivC+_serv.costiViviTot;const _cvP=_p<1?Math.round(_cvT/(1-_p)):_cvT;const _cvA=_a<1?Math.round(_cvP/(1-_a)):_cvP;const _totComm=_totFin+_cvA;const totD=cur2.code==='EUR'?fmtE(_totComm):cur2.sym+' '+Math.round(_totComm*cur2.rate).toLocaleString('it-IT');const tl2=tL(q.lineaTipoId);const tch2=techL(q.lineaTechId);
+return`<div style="background:#fff;border:1px solid #E8E6E0;border-left:4px solid ${auth?'#3d9e28':q.status==='emesso'?'#F08A05':'#E8E6E0'};border-radius:3px;padding:13px 16px;cursor:pointer" onmouseover="this.style.borderLeftColor='#F08A05'" onmouseout="this.style.borderLeftColor='${auth?'#3d9e28':q.status==='emesso'?'#F08A05':'#E8E6E0'}'" onclick="openQ('${q.id}')"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-family:'Barlow',sans-serif;font-size:15px;font-weight:600">${q.propNum||'—'}</span><span style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 9px;border-radius:2px;background:${sc.bg};color:${sc.c};border-left:2px solid ${sc.b}">${sc.l}</span><span style="font-size:11px;font-weight:500">v${q.ver}</span>${tl2?`<span style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 8px;background:#3D3D3C;color:#fff;border-radius:2px">${tl2}</span>`:''} ${tch2?`<span style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 8px;background:#E8EFF7;color:#1a4f82;border-radius:2px">${tch2}</span>`:''} ${auth?`<span style="font-family:Barlow Condensed,sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 8px;background:#E8F5E3;color:#1a5212;border-left:2px solid #3d9e28">✓ Auth.</span>`:''}</div><div style="font-size:13px;margin-top:3px;font-weight:500">${q.clientName||'Cliente non specificato'}${q.clientNazione?' ('+q.clientNazione+')':''}${q.clientRef?' · '+q.clientRef:''}</div><div class="lbl2" style="font-size:10px;margin-top:2px">${nM} moduli · ${new Date(q.updatedAt).toLocaleDateString('it-IT')}</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:16px;font-weight:700;color:#F08A05">${totD}</div><div class="lbl2" style="font-size:10px">${cur2.code}</div></div><div style="display:flex;flex-direction:column;gap:4px" onclick="event.stopPropagation()"><button data-qidc="${q.id}" onclick="dupQCliente(this.dataset.qidc)" style="padding:4px 8px;border-radius:3px;font-size:11px;font-family:Barlow Condensed,sans-serif;font-weight:600;display:flex;align-items:center;gap:4px;white-space:nowrap"><i class="ti ti-user-plus" style="font-size:12px"></i> Nuovo cliente</button><button data-qidr="${q.id}" onclick="dupQRevisione(this.dataset.qidr)" style="padding:4px 8px;border-radius:3px;font-size:11px;font-family:Barlow Condensed,sans-serif;font-weight:600;display:flex;align-items:center;gap:4px;white-space:nowrap"><i class="ti ti-versions" style="font-size:12px"></i> Revisione</button><button data-qid="${q.id}" onclick="delQ(this.dataset.qid)" style="padding:4px 8px;border-radius:3px;color:#c0200a;border-color:#F0C8C8;font-size:11px;font-family:Barlow Condensed,sans-serif;font-weight:600;display:flex;align-items:center;gap:4px"><i class="ti ti-trash" style="font-size:12px"></i> Elimina</button></div></div></div>`;}).join('')}</div></div>`;}
+
+function newQ(){const q=mkQ({propNum:'UCT26.P.3000.0'});S.quotes=[q,...S.quotes];S.qid=q.id;S.pg='config';S.step='cliente';S.srch='';S.grp={};S.mod={};S.suggFiltro=null;S.suggTipoId=null;S.showRateForm=false;S.rateFormNazione='';save();paint();}
+function openQ(id){S.qid=id;S.pg='config';S.step='cliente';S.srch='';S.grp={};S.mod={};S.showRateForm=false;const q=S.quotes.find(x=>x.id===id);S.suggFiltro=q?.lineaTipoId!=null?false:null;S.suggTipoId=q?.lineaTipoId??null;paint();}
+function dupQCliente(id){
+  const src=S.quotes.find(q=>q.id===id);if(!src)return;
+  // Formato atteso: UCT26.P.3000.0  →  prefisso = UCT26.P  numero = 3000  rev = 0
+  const parts=src.propNum.split('.');
+  // Le ultime due parti sono numero e revisione; tutto prima è prefisso
+  const rev=parts.pop();          // rimuove la revisione finale (es. "0")
+  const numStr=parts.pop();       // rimuove il numero progressivo (es. "3000")
+  const prefix=parts.join('.');   // es. "UCT26.P"
+  // Trova il numero più alto già usato per questo prefisso
+  const maxNum=S.quotes.reduce((mx,q)=>{
+    const p=q.propNum.split('.');
+    if(p.length<2)return mx;
+    const r=p.pop();const n=parseInt(p.pop())||0;
+    return n>mx?n:mx;
+  },parseInt(numStr)||0);
+  const newPropNum=prefix+'.'+(maxNum+1)+'.0';
+  const q=mkQ({...JSON.parse(JSON.stringify(src)),
+    id:Date.now().toString(),ver:1,
+    createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
+    status:'bozza',cfok:false,admk:false,cfokTs:null,admkTs:null,cfokLog:null,admkLog:null,
+    propNum:newPropNum,clientName:'',clientRef:'',clientNazione:''
+  });
+  S.quotes=[q,...S.quotes];S.qid=q.id;S.pg='config';S.step='cliente';
+  S.suggFiltro=src.lineaTipoId!=null?false:null;S.suggTipoId=src.lineaTipoId??null;
+  S.showRateForm=false;save();paint();
+}
+function dupQRevisione(id){
+  const src=S.quotes.find(q=>q.id===id);if(!src)return;
+  // Formato: UCT26.P.3000.0 → incrementa solo l'ultima parte (revisione)
+  const parts=src.propNum.split('.');
+  const revStr=parts.pop();       // rimuove revisione corrente (es. "0")
+  const base=parts.join('.');     // es. "UCT26.P.3000"
+  // Trova la revisione più alta già esistente per questo numero base
+  const maxRev=S.quotes.reduce((mx,q)=>{
+    const p=q.propNum.split('.');
+    const r=parseInt(p.pop())||0;
+    if(p.join('.')===base&&r>mx)return r;
+    return mx;
+  },parseInt(revStr)||0);
+  const newPropNum=base+'.'+(maxRev+1);
+  const q=mkQ({...JSON.parse(JSON.stringify(src)),
+    id:Date.now().toString(),ver:src.ver+1,
+    createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
+    status:'revisione',cfok:false,admk:false,cfokTs:null,admkTs:null,cfokLog:null,admkLog:null,
+    propNum:newPropNum
+  });
+  S.quotes=[q,...S.quotes];S.qid=q.id;S.pg='config';S.step='cliente';
+  S.suggFiltro=src.lineaTipoId!=null?false:null;S.suggTipoId=src.lineaTipoId??null;
+  S.showRateForm=false;save();paint();
+}
+function delQ(id){showConfirm('Vuoi eliminare questa offerta? L\u2019operazione non pu\u00f2 essere annullata.',function(){S.quotes=S.quotes.filter(function(q){return q.id!==id;});if(S.qid===id){S.qid=null;S.pg='list';}save();paint();});}
+function tGrp(cod){S.grp={...S.grp,[cod]:!S.grp[cod]};paint();}
+function tMod(midx){S.mod={...S.mod,[midx]:!S.mod[midx]};paint();}
+function esportaTutto(){const d=lsGet();const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='uct-cpq-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Backup esportato','ok');}
+function importaJSON(input){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.quotes)throw new Error();if(!window.confirm('Importare '+d.quotes.length+' offerte? I dati attuali verranno sostituiti.'))return;lsSet(d);
+boot();toast(`${d.quotes.length} offerte importate`,'ok');}catch(err){toast('File non valido.','err');}input.value='';};reader.readAsText(file);}
+
+boot();
+</script>
+</body>
+</html>
